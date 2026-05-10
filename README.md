@@ -33,7 +33,6 @@ Sistema web para reconhecimento de mérito estudantil por meio de uma moeda virt
 - [Testes](#testes)
 - [Documentação e Artefatos](#documentação-e-artefatos)
 - [Troubleshooting](#troubleshooting)
-- [Próximos Passos](#próximos-passos)
 - [Autores](#autores)
 - [Licença](#licença)
 
@@ -141,15 +140,22 @@ A API expõe endpoints REST para autenticação simples e operações CRUD. O fr
 
 ## Arquitetura
 
-O projeto segue uma separação clara entre frontend e backend.
+O projeto segue uma separação clara entre frontend e backend. Os três serviços principais são orquestrados pelo `docker-compose.yml` na raiz do projeto, cada um rodando em seu próprio container isolado e se comunicando pela rede interna do Compose.
 
 ```mermaid
 flowchart LR
-  U[Usuário] --> F[Frontend React/Vite]
-  F -->|HTTP/JSON| B[Backend Fastify]
+  U[Usuário] --> F["Frontend React/Vite\ncontainer: frontend"]
+  F -->|HTTP/JSON| B["Backend Fastify\ncontainer: backend"]
   B --> P[Prisma ORM]
-  P --> DB[(PostgreSQL)]
+  P --> DB[("PostgreSQL\ncontainer: db")]
   B --> S[Swagger/OpenAPI]
+
+  subgraph Docker Compose
+    F
+    B
+    P
+    DB
+  end
 ```
 
 ### Backend
