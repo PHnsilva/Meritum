@@ -10,6 +10,7 @@ Sistema web para reconhecimento de mérito estudantil por meio de uma moeda virt
 ![Backend](https://img.shields.io/badge/backend-Fastify%20%2B%20Prisma-111827?style=for-the-badge)
 ![Frontend](https://img.shields.io/badge/frontend-React%20%2B%20Vite-2563eb?style=for-the-badge)
 ![Database](https://img.shields.io/badge/database-PostgreSQL-316192?style=for-the-badge)
+![Docker](https://img.shields.io/badge/docker-compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
 
 ---
@@ -130,6 +131,11 @@ A API expõe endpoints REST para autenticação simples e operações CRUD. O fr
 - **PostgreSQL**
 - **Prisma Client**
 - **Prisma Migrate**
+
+### Infraestrutura
+
+- **Docker**
+- **Docker Compose**
 
 ---
 
@@ -265,6 +271,7 @@ Existe uma migration que insere instituições iniciais para desenvolvimento:
 
 ```txt
 Meritum/
+├── docker-compose.yml
 ├── Artefatos/
 │   ├── modelagem/
 │   │   ├── casos-de-uso/
@@ -284,6 +291,8 @@ Meritum/
 │       └── 10-moedas-placeholder.png
 ├── Codigo/
 │   ├── Backend/
+│   │   ├── Dockerfile
+│   │   ├── .dockerignore
 │   │   ├── prisma/
 │   │   │   ├── migrations/
 │   │   │   └── schema.prisma
@@ -301,6 +310,7 @@ Meritum/
 │   │   ├── tsconfig.json
 │   │   └── README.md
 │   └── Frontend/
+│       ├── Dockerfile
 │       ├── src/
 │       │   ├── app/
 │       │   ├── modules/
@@ -356,7 +366,52 @@ VITE_API_URL=http://localhost:3333
 
 ## Como Rodar Localmente
 
-### Pré-requisitos
+O projeto pode ser executado de duas formas: com **Docker Compose** (recomendado) ou manualmente com Node.js e PostgreSQL instalados localmente.
+
+---
+
+### Opção 1: Docker Compose (recomendada)
+
+#### Pré-requisitos
+
+- Docker instalado.
+- Docker Compose instalado.
+
+#### Subir todos os serviços
+
+Na raiz do projeto, onde está o `docker-compose.yml`:
+
+```bash
+docker compose up --build
+```
+
+Isso inicializa em conjunto o banco de dados PostgreSQL, o backend e o frontend.
+
+As aplicações ficam disponíveis em:
+
+```txt
+Frontend:  http://localhost:5173
+Backend:   http://localhost:3333
+Swagger:   http://localhost:3333/docs
+```
+
+Para derrubar os containers:
+
+```bash
+docker compose down
+```
+
+Para derrubar os containers e remover os volumes (apaga os dados do banco):
+
+```bash
+docker compose down -v
+```
+
+---
+
+### Opção 2: Execução manual
+
+#### Pré-requisitos
 
 - Node.js instalado.
 - npm instalado.
@@ -375,7 +430,7 @@ Porta: 5432
 Schema: public
 ```
 
-### 1. Configurar o backend
+#### 1. Configurar o backend
 
 ```bash
 cd Codigo/Backend
@@ -404,7 +459,7 @@ Health check:
 http://localhost:3333/health
 ```
 
-### 2. Configurar o frontend
+#### 2. Configurar o frontend
 
 Em outro terminal:
 
@@ -421,7 +476,9 @@ O frontend ficará disponível em:
 http://localhost:5173
 ```
 
-### 3. Criar usuário inicial
+---
+
+### Criar usuário inicial
 
 Na tela de login, use a opção **Criar usuário administrativo**.
 
@@ -783,7 +840,7 @@ http://localhost:3333/docs
 
 ## Troubleshooting
 
-### Erro de conexão com banco
+### Erro de conexão com banco (execução manual)
 
 Verifique se o PostgreSQL está em execução e se a `DATABASE_URL` do backend está correta.
 
@@ -845,9 +902,21 @@ npm run build
 npm start
 ```
 
-### Docker
+### Containers Docker não sobem
 
-Não há `Dockerfile` ou `docker-compose.yml` versionado no pacote ainda.
+Verifique se o Docker está em execução e se as portas `3333` e `5173` não estão ocupadas por outros processos. Para verificar logs de um serviço específico:
+
+```bash
+docker compose logs backend
+docker compose logs frontend
+docker compose logs db
+```
+
+Para reconstruir as imagens do zero após mudanças no código:
+
+```bash
+docker compose up --build
+```
 
 ---
 
