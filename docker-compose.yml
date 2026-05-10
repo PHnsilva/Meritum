@@ -1,0 +1,61 @@
+services:
+
+  postgres:
+    image: postgres:17
+    container_name: meritum-postgres
+
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: meritum
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./Codigo/Backend
+
+    container_name: meritum-backend
+
+    ports:
+      - "3333:3333"
+
+    environment:
+      DATABASE_URL: postgresql://admin:admin@postgres:5432/meritum?schema=public
+      PORT: 3333
+      HOST: 0.0.0.0
+
+    depends_on:
+      - postgres
+
+    volumes:
+      - ./Codigo/Backend:/app
+      - /app/node_modules
+
+    command: sh -c "npm run prisma:migrate && npm run dev"
+
+  frontend:
+    build:
+      context: ./Codigo/Frontend
+
+    container_name: meritum-frontend
+
+    ports:
+      - "5173:5173"
+
+    environment:
+      VITE_API_URL: http://localhost:3333
+
+    depends_on:
+      - backend
+
+    volumes:
+      - ./Codigo/Frontend:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:
