@@ -14,13 +14,25 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiClient<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function apiClient<T>(
+  path: string,
+  options: RequestOptions = {}
+): Promise<T> {
+
+  const hasBody = options.body !== undefined;
+
   const response = await fetch(`${API_URL}${path}`, {
     method: options.method ?? 'GET',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined
+
+    headers: hasBody
+      ? {
+          'Content-Type': 'application/json'
+        }
+      : undefined,
+
+    body: hasBody
+      ? JSON.stringify(options.body)
+      : undefined
   });
 
   if (response.status === 204) {
@@ -30,7 +42,10 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new ApiError(data?.message ?? 'Nao foi possivel concluir a operacao', response.status);
+    throw new ApiError(
+      data?.message ?? 'Nao foi possivel concluir a operacao',
+      response.status
+    );
   }
 
   return data as T;
