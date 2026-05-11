@@ -284,7 +284,7 @@ Meritum/
 │   │   ├── classes/
 │   │   ├── componentes/
 │   │   └── er/
-│   └── telas/                         # previsto para screenshots do frontend
+│   └── telas/                        
 │       ├── 01-login.png
 │       ├── 02-dashboard.png
 │       ├── 03-instituicoes-listagem.png
