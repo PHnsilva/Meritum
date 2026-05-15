@@ -1,0 +1,56 @@
+﻿@startuml
+title UC02 - Cadastrar Empresa Parceira
+
+actor "Empresa Parceira" as EP
+boundary "Frontend\nReact/Vite" as FE
+control "Sistema de\nGerenciamento" as SG
+database "Banco de\nDados" as BD
+
+EP -> FE: 2.1 acessarTelaCadastroParceiro()
+activate FE
+FE --> EP: 2.2 exibirFormularioParceiro()
+deactivate FE
+
+EP -> FE: 2.3 preencherDados(razaoSocial, nomeFantasia, email, cnpj, endereco, senha)
+activate FE
+EP -> FE: 2.4 confirmarCadastro()
+
+FE -> SG: 2.5 cadastrarEmpresaParceira(dadosEmpresa)
+activate SG
+
+SG -> SG: 2.6 validarDadosObrigatorios(dadosEmpresa)
+
+alt Campo obrigatório não preenchido
+    SG --> FE: 2.7 erroValidacao(camposInvalidos)
+    FE --> EP: 2.8 exibirCamposInvalidos(camposInvalidos)
+else Dados mínimos válidos
+    SG -> BD: 2.9 verificarEmpresaExistente(cnpj, email)
+    activate BD
+    BD --> SG: 2.10 resultadoVerificacao
+    deactivate BD
+
+    alt CNPJ ou email já cadastrado
+        SG --> FE: 2.11 erroCadastroDuplicado(cnpjOuEmail)
+        FE --> EP: 2.12 solicitarCorrecaoDados()
+    else Cadastro permitido
+        SG -> SG: 2.13 gerarHashSenha(senha)
+        SG -> BD: 2.14 salvarEmpresaParceira(dadosEmpresa, passwordHash)
+        activate BD
+
+        alt Falha ao persistir dados
+            BD --> SG: 2.15 erroPersistencia()
+            deactivate BD
+            SG --> FE: 2.16 erroGenericoCadastro()
+            FE --> EP: 2.17 orientarNovaTentativa()
+        else Persistência bem-sucedida
+            BD --> SG: 2.18 empresaCriada(empresaID)
+            deactivate BD
+            SG --> FE: 2.19 cadastroRealizado(empresaID)
+            FE --> EP: 2.20 exibirMensagemSucesso()
+        end
+    end
+end
+
+deactivate SG
+deactivate FE
+@enduml

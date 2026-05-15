@@ -1,0 +1,48 @@
+﻿@startuml
+title UC03 - Autenticar Login
+
+actor "Usuário" as U
+boundary "Frontend\nReact/Vite" as FE
+control "Sistema de\nGerenciamento" as SG
+database "Banco de\nDados" as BD
+
+U -> FE: 3.1 acessarTelaLogin()
+activate FE
+FE --> U: 3.2 exibirFormularioLogin()
+deactivate FE
+
+U -> FE: 3.3 informarCredenciais(email, senha)
+activate FE
+U -> FE: 3.4 confirmarLogin()
+
+FE -> SG: 3.5 autenticar(email, senha)
+activate SG
+
+SG -> BD: 3.6 buscarUsuarioPorEmail(email)
+activate BD
+BD --> SG: 3.7 dadosUsuario
+deactivate BD
+
+alt Usuário não encontrado
+    SG --> FE: 3.8 erroCredenciaisInvalidas()
+    FE --> U: 3.9 exibirErroGenericoLogin()
+else Usuário encontrado
+    SG -> SG: 3.10 verificarSenha(senha, passwordHash)
+
+    alt Senha inválida
+        SG --> FE: 3.11 erroCredenciaisInvalidas()
+        FE --> U: 3.12 exibirErroGenericoLogin()
+    else Conta inativa ou bloqueada
+        SG --> FE: 3.13 erroContaInativaOuBloqueada()
+        FE --> U: 3.14 orientarContatoSuporte()
+    else Credenciais válidas
+        SG -> SG: 3.15 criarSessaoUsuario(usuarioID, perfil)
+        SG --> FE: 3.16 usuarioAutenticado(dadosSessao)
+        FE -> FE: 3.17 armazenarSessaoLocal()
+        FE --> U: 3.18 redirecionarPainelPerfil()
+    end
+end
+
+deactivate SG
+deactivate FE
+@enduml

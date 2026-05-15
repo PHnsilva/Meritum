@@ -1,0 +1,25 @@
+﻿@startuml
+title UC11 - Validar Saldo
+
+participant "Caso de Uso\nChamador" as UC
+control "Sistema de\nGerenciamento" as SG
+database "Banco de\nDados" as BD
+
+UC -> SG: 11.1 validarSaldo(usuarioID, valorNecessario)
+activate SG
+
+SG -> BD: 11.2 consultarSaldoAtual(usuarioID)
+activate BD
+BD --> SG: 11.3 saldoAtual
+deactivate BD
+
+SG -> SG: 11.4 compararSaldo(saldoAtual, valorNecessario)
+
+alt Saldo suficiente
+    SG -->> UC: 11.5 saldoValido(true)
+else Saldo insuficiente
+    SG -->> UC: 11.6 saldoValido(false, saldoAtual, valorNecessario)
+end
+
+deactivate SG
+@enduml

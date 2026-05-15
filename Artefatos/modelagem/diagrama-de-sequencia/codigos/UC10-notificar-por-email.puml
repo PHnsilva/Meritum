@@ -1,0 +1,59 @@
+﻿@startuml
+title UC10 - Notificar por Email
+
+participant "Caso de Uso\nChamador" as UC
+control "Sistema de\nGerenciamento" as SG
+participant "Sistema de\nEmail" as SE
+database "Banco de\nDados" as BD
+actor Destinatario as D
+
+UC -> SG: 10.1 solicitarNotificacao(destinatarioID, tipoEvento, dadosEvento)
+activate SG
+
+SG -> SG: 10.2 identificarTipoEvento(tipoEvento)
+
+alt Recebimento de moedas
+    SG -> SG: 10.3 montarEmailRecebimentoMoedas(dadosEvento)
+else Cupom de vantagem
+    SG -> SG: 10.4 montarEmailCupomVantagem(dadosEvento)
+else Conferência para empresa parceira
+    SG -> SG: 10.5 montarEmailConferenciaParceiro(dadosEvento)
+end
+
+SG ->> SE: 10.6 enviarEmail(destinatario, assunto, conteudo)
+activate SE
+
+alt Envio bem-sucedido
+    SE -->> SG: 10.7 confirmacaoEnvio()
+    deactivate SE
+
+    SG -> BD: 10.8 registrarEnvioBemSucedido(destinatarioID, tipoEvento)
+    activate BD
+    BD --> SG: 10.9 envioRegistrado()
+    deactivate BD
+
+    SG -->> UC: 10.10 notificacaoEnviada()
+    SE ->> D: 10.11 entregarEmail()
+else Falha no envio
+    SE -->> SG: 10.12 erroEnvio(motivo)
+    deactivate SE
+
+    SG -> BD: 10.13 registrarFalhaEnvio(destinatarioID, motivo)
+    activate BD
+    BD --> SG: 10.14 falhaRegistrada()
+    deactivate BD
+
+    SG -> SG: 10.15 agendarReenvioAutomatico()
+
+    opt Falha persistente
+        SG -> BD: 10.16 registrarOcorrenciaAnaliseManual(destinatarioID)
+        activate BD
+        BD --> SG: 10.17 ocorrenciaRegistrada()
+        deactivate BD
+    end
+
+    SG -->> UC: 10.18 notificacaoPendenteReenvio()
+end
+
+deactivate SG
+@enduml

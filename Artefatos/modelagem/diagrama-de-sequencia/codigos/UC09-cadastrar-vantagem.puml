@@ -1,0 +1,60 @@
+﻿@startuml
+title UC09 - Cadastrar Vantagem
+
+actor "Empresa Parceira" as EP
+boundary "Frontend\nReact/Vite" as FE
+control "Sistema de\nGerenciamento" as SG
+database "Banco de\nDados" as BD
+collections "Armazenamento\nde Imagens" as IMG
+
+EP -> FE: 9.1 acessarCadastroVantagem()
+activate FE
+FE --> EP: 9.2 exibirFormularioVantagem()
+deactivate FE
+
+EP -> FE: 9.3 preencherDados(nome, descricao, custo)
+activate FE
+EP -> FE: 9.4 selecionarFotoProduto(arquivoImagem)
+EP -> FE: 9.5 confirmarCadastro()
+
+FE -> SG: 9.6 cadastrarVantagem(dadosVantagem, arquivoImagem)
+activate SG
+
+SG -> SG: 9.7 validarCamposObrigatorios(dadosVantagem)
+
+alt Campo obrigatório não preenchido
+    SG --> FE: 9.8 erroCamposObrigatorios(camposInvalidos)
+    FE --> EP: 9.9 exibirCamposInvalidos()
+else Campos preenchidos
+    SG -> SG: 9.10 validarFormatoImagem(arquivoImagem)
+
+    alt Formato de imagem inválido
+        SG --> FE: 9.11 erroFormatoImagem()
+        FE --> EP: 9.12 solicitarNovoUpload()
+    else Imagem válida
+        SG -> IMG: 9.13 fazerUploadImagem(arquivoImagem)
+        activate IMG
+
+        alt Falha no upload
+            IMG --> SG: 9.14 erroUpload()
+            deactivate IMG
+            SG --> FE: 9.15 erroUploadImagem()
+            FE --> EP: 9.16 permitirNovaTentativaSemPerderDados()
+        else Upload realizado
+            IMG --> SG: 9.17 urlImagem
+            deactivate IMG
+
+            SG -> BD: 9.18 salvarVantagem(dadosVantagem, urlImagem, empresaID)
+            activate BD
+            BD --> SG: 9.19 vantagemCriada(vantagemID)
+            deactivate BD
+
+            SG --> FE: 9.20 cadastroVantagemConcluido(vantagemID)
+            FE --> EP: 9.21 exibirMensagemSucesso()
+        end
+    end
+end
+
+deactivate SG
+deactivate FE
+@enduml

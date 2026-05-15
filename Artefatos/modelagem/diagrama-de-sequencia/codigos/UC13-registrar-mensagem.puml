@@ -1,0 +1,28 @@
+﻿@startuml
+title UC13 - Registrar Mensagem
+
+actor Professor as P
+boundary "Frontend\nReact/Vite" as FE
+control "Sistema de\nGerenciamento" as SG
+
+P -> FE: 13.1 acessarFormularioEnvioMoedas()
+activate FE
+FE --> P: 13.2 exibirCampoMensagem()
+deactivate FE
+
+P -> FE: 13.3 preencherMensagem(motivo)
+activate FE
+FE -> SG: 13.4 validarMensagem(motivo)
+activate SG
+
+alt Campo vazio
+    SG --> FE: 13.5 erroMensagemObrigatoria()
+    FE --> P: 13.6 impedirEnvioMoedas()
+else Campo preenchido
+    SG --> FE: 13.7 mensagemValida(motivo)
+    FE --> P: 13.8 permitirConfirmacaoEnvio()
+end
+
+deactivate SG
+deactivate FE
+@enduml

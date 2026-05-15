@@ -1,0 +1,106 @@
+﻿@startuml
+title UC08 - Trocar Moedas
+
+actor Aluno as A
+boundary "Frontend\nReact/Vite" as FE
+control "Sistema de\nGerenciamento" as SG
+database "Banco de\nDados" as BD
+participant "Sistema de\nEmail" as SE
+
+A -> FE: 8.1 acessarListaVantagens()
+activate FE
+
+FE -> SG: 8.2 consultarVantagensDisponiveis()
+activate SG
+SG -> BD: 8.3 buscarVantagensAtivas()
+activate BD
+BD --> SG: 8.4 listaVantagens
+deactivate BD
+SG --> FE: 8.5 vantagensDisponiveis(listaVantagens)
+deactivate SG
+
+FE --> A: 8.6 exibirVantagens(listaVantagens)
+
+A -> FE: 8.7 selecionarVantagem(vantagemID)
+FE -> SG: 8.8 consultarDetalhesVantagem(vantagemID)
+activate SG
+SG -> BD: 8.9 buscarVantagem(vantagemID)
+activate BD
+BD --> SG: 8.10 dadosVantagem
+deactivate BD
+SG --> FE: 8.11 detalhesVantagem(dadosVantagem)
+deactivate SG
+FE --> A: 8.12 solicitarConfirmacaoResgate()
+
+A -> FE: 8.13 confirmarResgate()
+FE -> SG: 8.14 trocarMoedas(alunoID, vantagemID)
+activate SG
+
+SG -> BD: 8.15 verificarVantagemDisponivel(vantagemID)
+activate BD
+BD --> SG: 8.16 statusVantagem
+deactivate BD
+
+alt Vantagem indisponível
+    SG --> FE: 8.17 erroVantagemIndisponivel()
+    FE --> A: 8.18 retornarListaAtualizada()
+else Vantagem disponível
+    SG -> BD: 8.19 consultarSaldo(alunoID)
+    activate BD
+    BD --> SG: 8.20 saldoAluno
+    deactivate BD
+
+    SG -> BD: 8.21 consultarCustoVantagem(vantagemID)
+    activate BD
+    BD --> SG: 8.22 custoVantagem
+    deactivate BD
+
+    alt Saldo insuficiente
+        SG --> FE: 8.23 erroSaldoInsuficiente(saldoAluno, custoVantagem)
+        FE --> A: 8.24 exibirErroSaldoInsuficiente()
+    else Saldo suficiente
+        SG -> BD: 8.25 debitarSaldo(alunoID, custoVantagem)
+        activate BD
+        BD --> SG: 8.26 saldoDebitado()
+        deactivate BD
+
+        loop Até gerar código único
+            SG -> SG: 8.27 gerarCodigoCupom()
+            SG -> BD: 8.28 verificarCupomExistente(codigo)
+            activate BD
+            BD --> SG: 8.29 resultadoUnicidade
+            deactivate BD
+        end
+
+        SG -> BD: 8.30 salvarResgateECupom(alunoID, vantagemID, codigo)
+        activate BD
+        BD --> SG: 8.31 resgateRegistrado(resgateID)
+        deactivate BD
+
+        SG -> BD: 8.32 registrarTransacaoResgate(alunoID, vantagemID, custoVantagem)
+        activate BD
+        BD --> SG: 8.33 transacaoRegistrada()
+        deactivate BD
+
+        SG ->> SE: 8.34 enviarEmailCupom(alunoID, codigo, vantagem)
+        SG ->> SE: 8.35 enviarEmailConferencia(empresaID, codigo, vantagem)
+
+        alt Falha no envio de email
+            SE -->> SG: 8.36 erroEnvioEmail()
+            SG -> BD: 8.37 registrarFalhaNotificacao(resgateID)
+            activate BD
+            BD --> SG: 8.38 falhaRegistrada()
+            deactivate BD
+            SG --> FE: 8.39 resgateConcluidoComPendenciaEmail(resgateID)
+            FE --> A: 8.40 exibirConfirmacaoComAlertaEmail()
+        else Emails enviados
+            SE -->> SG: 8.41 emailsEnviados()
+            SG --> FE: 8.42 resgateConcluido(resgateID, codigo)
+            FE --> A: 8.43 exibirConfirmacaoResgate(codigo)
+        end
+    end
+end
+
+deactivate SG
+deactivate FE
+@enduml

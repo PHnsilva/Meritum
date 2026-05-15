@@ -1,0 +1,32 @@
+﻿@startuml
+title UC14 - Debitar Saldo
+
+participant "Caso de Uso\nChamador" as UC
+control "Sistema de\nGerenciamento" as SG
+database "Banco de\nDados" as BD
+
+UC -> SG: 14.1 debitarSaldo(usuarioID, valorOperacao)
+activate SG
+
+SG -> BD: 14.2 consultarSaldoAtual(usuarioID)
+activate BD
+BD --> SG: 14.3 saldoAtual
+deactivate BD
+
+SG -> SG: 14.4 calcularNovoSaldo(saldoAtual, valorOperacao)
+
+SG -> BD: 14.5 persistirNovoSaldo(usuarioID, novoSaldo)
+activate BD
+
+alt Falha na persistência
+    BD --> SG: 14.6 erroPersistencia()
+    deactivate BD
+    SG -->> UC: 14.7 debitoFalhou(motivo)
+else Débito persistido
+    BD --> SG: 14.8 saldoAtualizado()
+    deactivate BD
+    SG -->> UC: 14.9 debitoConfirmado(novoSaldo)
+end
+
+deactivate SG
+@enduml

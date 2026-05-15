@@ -1,0 +1,32 @@
+﻿@startuml
+title UC07 - Visualizar Saldo
+
+actor "Usuário" as U
+boundary "Frontend\nReact/Vite" as FE
+control "Sistema de\nGerenciamento" as SG
+database "Banco de\nDados" as BD
+
+U -> FE: 7.1 acessarSaldo()
+activate FE
+
+FE -> SG: 7.2 consultarSaldo(usuarioID)
+activate SG
+
+SG -> BD: 7.3 buscarSaldoAtual(usuarioID)
+activate BD
+
+alt Falha na consulta
+    BD --> SG: 7.4 erroConsultaSaldo()
+    deactivate BD
+    SG --> FE: 7.5 erroVisualizarSaldo()
+    FE --> U: 7.6 orientarNovaTentativa()
+else Consulta bem-sucedida
+    BD --> SG: 7.7 saldoAtual
+    deactivate BD
+    SG --> FE: 7.8 saldoEncontrado(saldoAtual)
+    FE --> U: 7.9 exibirSaldoAtual(saldoAtual)
+end
+
+deactivate SG
+deactivate FE
+@enduml

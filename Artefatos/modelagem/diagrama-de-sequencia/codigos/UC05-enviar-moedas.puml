@@ -1,0 +1,79 @@
+﻿@startuml
+title UC05 - Enviar Moedas
+
+actor Professor as P
+boundary "Frontend\nReact/Vite" as FE
+control "Sistema de\nGerenciamento" as SG
+database "Banco de\nDados" as BD
+participant "Sistema de\nEmail" as SE
+
+P -> FE: 5.1 acessarEnvioMoedas()
+activate FE
+FE --> P: 5.2 exibirFormularioEnvio()
+deactivate FE
+
+P -> FE: 5.3 selecionarAluno(alunoID)
+activate FE
+P -> FE: 5.4 informarQuantidade(quantidade)
+P -> FE: 5.5 preencherMensagem(motivo)
+P -> FE: 5.6 confirmarEnvio()
+
+FE -> SG: 5.7 enviarMoedas(professorID, alunoID, quantidade, motivo)
+activate SG
+
+SG -> SG: 5.8 validarMensagemObrigatoria(motivo)
+
+alt Mensagem não preenchida
+    SG --> FE: 5.9 erroMensagemObrigatoria()
+    FE --> P: 5.10 exibirMensagemValidacao()
+else Mensagem preenchida
+    SG -> BD: 5.11 verificarAlunoAtivo(alunoID)
+    activate BD
+    BD --> SG: 5.12 dadosAluno
+    deactivate BD
+
+    SG -> BD: 5.13 consultarSaldo(professorID)
+    activate BD
+    BD --> SG: 5.14 saldoProfessor
+    deactivate BD
+
+    alt Saldo insuficiente
+        SG --> FE: 5.15 erroSaldoInsuficiente(saldoProfessor, quantidade)
+        FE --> P: 5.16 exibirErroSaldoInsuficiente()
+    else Saldo suficiente
+        SG -> BD: 5.17 debitarSaldo(professorID, quantidade)
+        activate BD
+        BD --> SG: 5.18 saldoProfessorAtualizado
+        deactivate BD
+
+        SG -> BD: 5.19 creditarSaldo(alunoID, quantidade)
+        activate BD
+        BD --> SG: 5.20 saldoAlunoAtualizado
+        deactivate BD
+
+        SG -> BD: 5.21 registrarTransacao(professorID, alunoID, quantidade, motivo)
+        activate BD
+        BD --> SG: 5.22 transacaoRegistrada(transacaoID)
+        deactivate BD
+
+        SG ->> SE: 5.23 enviarEmailRecebimento(alunoID, quantidade, motivo)
+
+        alt Falha no envio do email
+            SE -->> SG: 5.24 erroEnvioEmail()
+            SG -> BD: 5.25 registrarFalhaNotificacao(transacaoID)
+            activate BD
+            BD --> SG: 5.26 falhaRegistrada()
+            deactivate BD
+            SG --> FE: 5.27 envioConcluidoComPendenciaEmail(transacaoID)
+            FE --> P: 5.28 exibirConfirmacaoComAlertaEmail()
+        else Email enviado
+            SE -->> SG: 5.29 emailEnviado()
+            SG --> FE: 5.30 envioConcluido(transacaoID)
+            FE --> P: 5.31 exibirConfirmacaoEnvio()
+        end
+    end
+end
+
+deactivate SG
+deactivate FE
+@enduml

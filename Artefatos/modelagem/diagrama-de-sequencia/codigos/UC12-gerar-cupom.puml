@@ -1,0 +1,32 @@
+﻿@startuml
+title UC12 - Gerar Cupom
+
+participant "UC08 - Trocar\nMoedas" as UC08
+control "Sistema de\nGerenciamento" as SG
+database "Banco de\nDados" as BD
+
+UC08 -> SG: 12.1 gerarCupom(alunoID, vantagemID, dataHora)
+activate SG
+
+loop Até gerar código único
+    SG -> SG: 12.2 gerarCodigoUnico()
+    SG -> BD: 12.3 verificarCodigoCupom(codigo)
+    activate BD
+    BD --> SG: 12.4 resultadoVerificacao
+    deactivate BD
+
+    alt Código duplicado
+        SG -> SG: 12.5 descartarCodigoDuplicado()
+    else Código único
+        SG -> SG: 12.6 selecionarCodigoValido(codigo)
+    end
+end
+
+SG -> BD: 12.7 salvarCupom(alunoID, vantagemID, codigo, dataHora)
+activate BD
+BD --> SG: 12.8 cupomPersistido(cupomID)
+deactivate BD
+
+SG -->> UC08: 12.9 cupomGerado(cupomID, codigo)
+deactivate SG
+@enduml

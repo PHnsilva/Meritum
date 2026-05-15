@@ -1,0 +1,55 @@
+﻿@startuml
+title UC04 - Autorizar Crédito Semestral
+
+actor "Instituição de Ensino" as IE
+control "Sistema de\nGerenciamento" as SG
+database "Banco de\nDados" as BD
+
+IE -> SG: 4.1 iniciarCreditoSemestral(semestreLetivo)
+activate SG
+
+SG -> SG: 4.2 verificarInicioNovoSemestre(semestreLetivo)
+
+SG -> BD: 4.3 listarProfessoresVinculados()
+activate BD
+BD --> SG: 4.4 listaProfessores
+deactivate BD
+
+loop Para cada professor vinculado
+    SG -> BD: 4.5 consultarSaldoProfessor(professorID)
+    activate BD
+    BD --> SG: 4.6 saldoAtual
+    deactivate BD
+
+    SG -> SG: 4.7 calcularNovoSaldo(saldoAtual, 1000)
+
+    SG -> BD: 4.8 atualizarSaldoProfessor(professorID, novoSaldo)
+    activate BD
+
+    alt Falha no processamento do professor
+        BD --> SG: 4.9 erroAtualizacaoSaldo(professorID)
+        deactivate BD
+        SG -> BD: 4.10 registrarErroCredito(professorID, motivo)
+        activate BD
+        BD --> SG: 4.11 erroRegistrado()
+        deactivate BD
+        SG -> SG: 4.12 marcarParaReprocessamento(professorID)
+    else Crédito processado
+        BD --> SG: 4.13 saldoAtualizado()
+        deactivate BD
+
+        SG -> BD: 4.14 registrarExtratoCredito(professorID, 1000, semestreLetivo)
+        activate BD
+        BD --> SG: 4.15 creditoRegistrado()
+        deactivate BD
+    end
+end
+
+SG -> BD: 4.16 registrarDataCreditoSemestral(semestreLetivo)
+activate BD
+BD --> SG: 4.17 processamentoRegistrado()
+deactivate BD
+
+SG --> IE: 4.18 creditoSemestralConcluido(resumoProcessamento)
+deactivate SG
+@enduml

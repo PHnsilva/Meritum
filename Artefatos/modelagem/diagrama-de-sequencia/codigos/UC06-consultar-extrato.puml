@@ -1,0 +1,48 @@
+﻿@startuml
+title UC06 - Consultar Extrato
+
+actor "Usuário" as U
+boundary "Frontend\nReact/Vite" as FE
+control "Sistema de\nGerenciamento" as SG
+database "Banco de\nDados" as BD
+
+U -> FE: 6.1 acessarExtrato()
+activate FE
+
+FE -> SG: 6.2 consultarExtrato(usuarioID, perfil)
+activate SG
+
+SG -> BD: 6.3 buscarTransacoes(usuarioID)
+activate BD
+
+alt Falha na consulta
+    BD --> SG: 6.4 erroConsulta()
+    deactivate BD
+    SG --> FE: 6.5 erroConsultaExtrato()
+    FE --> U: 6.6 orientarNovaTentativa()
+else Consulta realizada
+    BD --> SG: 6.7 listaTransacoes
+    deactivate BD
+
+    SG -> BD: 6.8 consultarSaldoAtual(usuarioID)
+    activate BD
+    BD --> SG: 6.9 saldoAtual
+    deactivate BD
+
+    alt Nenhuma transação registrada
+        SG --> FE: 6.10 extratoVazio(saldoAtual)
+        FE --> U: 6.11 exibirMensagemSemTransacoes()
+    else Perfil Professor
+        SG -> SG: 6.12 montarExtratoEnvios(listaTransacoes)
+        SG --> FE: 6.13 extratoProfessor(transacoes, saldoAtual)
+        FE --> U: 6.14 exibirEnviosRealizados()
+    else Perfil Aluno
+        SG -> SG: 6.15 montarExtratoAluno(listaTransacoes)
+        SG --> FE: 6.16 extratoAluno(transacoes, saldoAtual)
+        FE --> U: 6.17 exibirRecebimentosETrocas()
+    end
+end
+
+deactivate SG
+deactivate FE
+@enduml
