@@ -283,6 +283,7 @@ Meritum/
 │   │   ├── casos-de-uso/
 │   │   ├── classes/
 │   │   ├── componentes/
+|   |   ├── diagrama-de-sequencia/
 │   │   └── er/
 │   └── telas/                        
 │       ├── 01-login.png
