@@ -1,5 +1,9 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
+export function generateTempPassword(): string {
+  return randomBytes(5).toString('hex'); // 10 chars hex legível
+}
+
 const keyLength = 64;
 
 export function hashPassword(password: string) {

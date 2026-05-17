@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { DomainErrors } from '../../../shared/errors/domain-errors.js';
 
 export type CreateInstitutionInput = {
   name: string;
@@ -15,9 +16,13 @@ export function createInstitutionService(app: FastifyInstance) {
     },
 
     findById(id: string) {
-      return app.prisma.institution.findUnique({
-        where: { id }
-      });
+      return app.prisma.institution.findUnique({ where: { id } });
+    },
+
+    async findByIdOrThrow(id: string) {
+      const institution = await app.prisma.institution.findUnique({ where: { id } });
+      if (!institution) throw DomainErrors.institutionNotFound();
+      return institution;
     },
 
     create(input: CreateInstitutionInput) {

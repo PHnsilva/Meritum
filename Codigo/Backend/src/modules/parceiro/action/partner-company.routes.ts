@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
+import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
+import { requireRole } from '../../../shared/auth/require-role.js';
 import { createPartnerCompanyService, type CreatePartnerCompanyInput, type UpdatePartnerCompanyInput } from '../application/partner-company-service.js';
 import { toPartnerCompanyListResponse, toPartnerCompanyResponse } from '../responder/partner-company-responder.js';
-import { isUniqueConstraintError } from '../../../shared/prisma/prisma-errors.js';
 
 const partnerCompanyResponseSchema = {
   type: 'object',
@@ -36,137 +37,103 @@ const updatePartnerCompanyBodySchema = {
   properties: partnerCompanyBodySchema.properties
 } as const;
 
-const notFoundSchema = {
-  type: 'object',
-  properties: { message: { type: 'string' } }
-} as const;
+const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
-const conflictSchema = {
+const paginatedPartnerSchema = {
   type: 'object',
-  properties: { message: { type: 'string' } }
+  properties: {
+    data: { type: 'array', items: partnerCompanyResponseSchema },
+    total: { type: 'integer' },
+    page: { type: 'integer' },
+    limit: { type: 'integer' },
+    totalPages: { type: 'integer' }
+  }
 } as const;
 
 export async function partnerCompanyRoutes(app: FastifyInstance) {
-  const partnerCompanyService = createPartnerCompanyService(app);
+  const service = createPartnerCompanyService(app);
 
-  app.get('/api/parceiros', {
+  app.get<{ Querystring: { page?: number; limit?: number } }>('/api/parceiros', {
+    preHandler: [app.authenticate, requireRole('admin')],
     schema: {
       tags: ['Parceiros'],
-      summary: 'Lista empresas parceiras cadastradas',
-      response: {
-        200: {
-          type: 'array',
-          items: partnerCompanyResponseSchema
+      summary: 'Lista empresas parceiras cadastradas (paginado)',
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1, default: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 }
         }
-      }
+      },
+      response: { 200: paginatedPartnerSchema }
     }
-  }, async () => {
-    const partnerCompanies = await partnerCompanyService.list();
-    return toPartnerCompanyListResponse(partnerCompanies);
+  }, async (request) => {
+    const { page = 1, limit = 50 } = request.query;
+    const result = await service.list(page, limit);
+    return { ...result, data: toPartnerCompanyListResponse(result.data) };
   });
 
   app.get<{ Params: { id: string } }>('/api/parceiros/:id', {
+    preHandler: [app.authenticate, requireRole('admin', 'partner')],
     schema: {
       tags: ['Parceiros'],
       summary: 'Consulta uma empresa parceira pelo identificador',
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'string', format: 'uuid' } }
-      },
-      response: {
-        200: partnerCompanyResponseSchema,
-        404: notFoundSchema
-      }
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
+      response: { 200: partnerCompanyResponseSchema, 404: errorSchema }
     }
   }, async (request, reply) => {
-    const partnerCompany = await partnerCompanyService.findById(request.params.id);
-
-    if (!partnerCompany) {
-      return reply.status(404).send({ message: 'Empresa parceira nao encontrada' });
-    }
-
+    const partnerCompany = await service.findById(request.params.id);
+    if (!partnerCompany) return reply.status(404).send({ message: 'Empresa parceira nao encontrada' });
     return toPartnerCompanyResponse(partnerCompany);
   });
 
   app.post<{ Body: CreatePartnerCompanyInput }>('/api/parceiros', {
+    preHandler: [app.authenticate, requireRole('admin')],
     schema: {
       tags: ['Parceiros'],
       summary: 'Cadastra uma empresa parceira',
       body: partnerCompanyBodySchema,
-      response: {
-        201: partnerCompanyResponseSchema,
-        409: conflictSchema
-      }
+      response: { 201: partnerCompanyResponseSchema, 409: errorSchema }
     }
   }, async (request, reply) => {
     try {
-      const partnerCompany = await partnerCompanyService.create(request.body);
+      const partnerCompany = await service.create(request.body);
       return reply.status(201).send(toPartnerCompanyResponse(partnerCompany));
     } catch (error) {
-      if (isUniqueConstraintError(error)) {
-        return reply.status(409).send({ message: 'Empresa parceira ja cadastrada com email ou CNPJ informado' });
-      }
-
-      throw error;
+      return sendErrorResponse(reply, error, 'Empresa parceira ja cadastrada com email ou CNPJ informado');
     }
   });
 
   app.put<{ Params: { id: string }; Body: UpdatePartnerCompanyInput }>('/api/parceiros/:id', {
+    preHandler: [app.authenticate, requireRole('admin', 'partner')],
     schema: {
       tags: ['Parceiros'],
       summary: 'Atualiza uma empresa parceira',
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'string', format: 'uuid' } }
-      },
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
       body: updatePartnerCompanyBodySchema,
-      response: {
-        200: partnerCompanyResponseSchema,
-        404: notFoundSchema,
-        409: conflictSchema
-      }
+      response: { 200: partnerCompanyResponseSchema, 404: errorSchema, 409: errorSchema }
     }
   }, async (request, reply) => {
     try {
-      const partnerCompany = await partnerCompanyService.update(request.params.id, request.body);
-
-      if (!partnerCompany) {
-        return reply.status(404).send({ message: 'Empresa parceira nao encontrada' });
-      }
-
+      const partnerCompany = await service.update(request.params.id, request.body);
+      if (!partnerCompany) return reply.status(404).send({ message: 'Empresa parceira nao encontrada' });
       return toPartnerCompanyResponse(partnerCompany);
     } catch (error) {
-      if (isUniqueConstraintError(error)) {
-        return reply.status(409).send({ message: 'Empresa parceira ja cadastrada com email ou CNPJ informado' });
-      }
-
-      throw error;
+      return sendErrorResponse(reply, error, 'Empresa parceira ja cadastrada com email ou CNPJ informado');
     }
   });
 
   app.delete<{ Params: { id: string } }>('/api/parceiros/:id', {
+    preHandler: [app.authenticate, requireRole('admin')],
     schema: {
       tags: ['Parceiros'],
       summary: 'Remove uma empresa parceira',
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'string', format: 'uuid' } }
-      },
-      response: {
-        204: { type: 'null' },
-        404: notFoundSchema
-      }
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
+      response: { 204: { type: 'null' }, 404: errorSchema }
     }
   }, async (request, reply) => {
-    const partnerCompany = await partnerCompanyService.delete(request.params.id);
-
-    if (!partnerCompany) {
-      return reply.status(404).send({ message: 'Empresa parceira nao encontrada' });
-    }
-
+    const partnerCompany = await service.delete(request.params.id);
+    if (!partnerCompany) return reply.status(404).send({ message: 'Empresa parceira nao encontrada' });
     return reply.status(204).send();
   });
 }

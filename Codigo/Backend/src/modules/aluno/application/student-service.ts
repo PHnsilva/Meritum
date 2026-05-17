@@ -1,5 +1,10 @@
 import type { FastifyInstance } from 'fastify';
+import { CPF } from '../../../shared/domain/value-objects/cpf.js';
+import { EmailVO } from '../../../shared/domain/value-objects/email-vo.js';
+import { DomainErrors } from '../../../shared/errors/domain-errors.js';
 import { hashPassword } from '../../../shared/security/password-hasher.js';
+import { paginate, toPaginatedResult } from '../../../shared/pagination/pagination.js';
+import { createInstitutionService } from '../../instituicao/application/institution-service.js';
 
 export type CreateStudentInput = {
   name: string;
@@ -17,86 +22,99 @@ export type UpdateStudentInput = Partial<Omit<CreateStudentInput, 'password'>> &
 };
 
 export function createStudentService(app: FastifyInstance) {
-  async function ensureInstitutionExists(institutionId: string) {
-    const institution = await app.prisma.institution.findUnique({
-      where: { id: institutionId }
-    });
-
-    if (!institution) {
-      const error = new Error('Instituicao de ensino nao encontrada');
-      error.name = 'InstitutionNotFoundError';
-      throw error;
-    }
-  }
+  const institutionService = createInstitutionService(app);
 
   return {
-    list() {
-      return app.prisma.student.findMany({
-        include: { institution: true },
-        orderBy: { createdAt: 'desc' }
-      });
+    async list(institutionId?: string, page = 1, limit = 50) {
+      const where = institutionId ? { institutionId } : undefined;
+      const p = paginate(page, limit);
+      const [data, total] = await Promise.all([
+        app.prisma.student.findMany({
+          where,
+          include: { user: true, institution: true },
+          orderBy: { createdAt: 'desc' },
+          skip: p.skip,
+          take: p.take
+        }),
+        app.prisma.student.count({ where })
+      ]);
+      return toPaginatedResult(data, total, p.page, p.limit);
     },
 
     findById(id: string) {
       return app.prisma.student.findUnique({
         where: { id },
-        include: { institution: true }
+        include: { user: true, institution: true }
       });
     },
 
     async create(input: CreateStudentInput) {
-      await ensureInstitutionExists(input.institutionId);
+      EmailVO.create(input.email);
+      CPF.create(input.cpf);
+      await institutionService.findByIdOrThrow(input.institutionId);
 
-      return app.prisma.student.create({
-        data: {
-          name: input.name,
-          email: input.email,
-          cpf: input.cpf,
-          rg: input.rg,
-          address: input.address,
-          institutionId: input.institutionId,
-          course: input.course,
-          passwordHash: hashPassword(input.password)
-        },
-        include: { institution: true }
+      return app.prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            name: input.name,
+            email: input.email,
+            cpf: input.cpf,
+            passwordHash: hashPassword(input.password),
+            role: 'STUDENT'
+          }
+        });
+
+        return tx.student.create({
+          data: {
+            userId: user.id,
+            rg: input.rg,
+            address: input.address,
+            course: input.course,
+            institutionId: input.institutionId
+          },
+          include: { user: true, institution: true }
+        });
       });
     },
 
     async update(id: string, input: UpdateStudentInput) {
-      if (input.institutionId) {
-        await ensureInstitutionExists(input.institutionId);
-      }
+      if (input.email) EmailVO.create(input.email);
+      if (input.cpf) CPF.create(input.cpf);
+      if (input.institutionId) await institutionService.findByIdOrThrow(input.institutionId);
 
-      const student = await app.prisma.student.findUnique({ where: { id } });
+      const student = await app.prisma.student.findUnique({ where: { id }, include: { user: true } });
+      if (!student) return null;
 
-      if (!student) {
-        return null;
-      }
+      return app.prisma.$transaction(async (tx) => {
+        if (input.name || input.email || input.cpf || input.password) {
+          await tx.user.update({
+            where: { id: student.userId },
+            data: {
+              ...(input.name ? { name: input.name } : {}),
+              ...(input.email ? { email: input.email } : {}),
+              ...(input.cpf ? { cpf: input.cpf } : {}),
+              ...(input.password ? { passwordHash: hashPassword(input.password) } : {})
+            }
+          });
+        }
 
-      return app.prisma.student.update({
-        where: { id },
-        data: {
-          name: input.name,
-          email: input.email,
-          cpf: input.cpf,
-          rg: input.rg,
-          address: input.address,
-          institutionId: input.institutionId,
-          course: input.course,
-          ...(input.password ? { passwordHash: hashPassword(input.password) } : {})
-        },
-        include: { institution: true }
+        return tx.student.update({
+          where: { id },
+          data: {
+            ...(input.rg ? { rg: input.rg } : {}),
+            ...(input.address ? { address: input.address } : {}),
+            ...(input.course ? { course: input.course } : {}),
+            ...(input.institutionId ? { institutionId: input.institutionId } : {})
+          },
+          include: { user: true, institution: true }
+        });
       });
     },
 
     async delete(id: string) {
       const student = await app.prisma.student.findUnique({ where: { id } });
-
-      if (!student) {
-        return null;
-      }
-
-      await app.prisma.student.delete({ where: { id } });
+      if (!student) return null;
+      await app.prisma.user.delete({ where: { id: student.userId } });
       return student;
     }
   };
