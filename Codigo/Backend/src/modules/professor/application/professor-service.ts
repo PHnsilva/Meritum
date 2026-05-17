@@ -3,6 +3,7 @@ import { CPF } from '../../../shared/domain/value-objects/cpf.js';
 import { EmailVO } from '../../../shared/domain/value-objects/email-vo.js';
 import { DomainErrors } from '../../../shared/errors/domain-errors.js';
 import { generateTempPassword, hashPassword } from '../../../shared/security/password-hasher.js';
+import { paginate, toPaginatedResult } from '../../../shared/pagination/pagination.js';
 import { createInstitutionService } from '../../instituicao/application/institution-service.js';
 
 export type CreateProfessorInput = {
@@ -19,11 +20,18 @@ export function createProfessorService(app: FastifyInstance) {
   const institutionService = createInstitutionService(app);
 
   return {
-    list() {
-      return app.prisma.professor.findMany({
-        include: { user: true, institution: true },
-        orderBy: { createdAt: 'desc' }
-      });
+    async list(page = 1, limit = 50) {
+      const p = paginate(page, limit);
+      const [data, total] = await Promise.all([
+        app.prisma.professor.findMany({
+          include: { user: true, institution: true },
+          orderBy: { createdAt: 'desc' },
+          skip: p.skip,
+          take: p.take
+        }),
+        app.prisma.professor.count()
+      ]);
+      return toPaginatedResult(data, total, p.page, p.limit);
     },
 
     findById(id: string) {

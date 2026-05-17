@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
+import { requireRole } from '../../../shared/auth/require-role.js';
 import { createStudentService, type CreateStudentInput, type UpdateStudentInput } from '../application/student-service.js';
 import { toStudentListResponse, toStudentResponse } from '../responder/student-responder.js';
 
@@ -49,25 +50,43 @@ const updateStudentBodySchema = {
 
 const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
+const paginatedStudentSchema = {
+  type: 'object',
+  properties: {
+    data: { type: 'array', items: studentResponseSchema },
+    total: { type: 'integer' },
+    page: { type: 'integer' },
+    limit: { type: 'integer' },
+    totalPages: { type: 'integer' }
+  }
+} as const;
+
 export async function studentRoutes(app: FastifyInstance) {
   const studentService = createStudentService(app);
 
-  app.get<{ Querystring: { institutionId?: string } }>('/api/alunos', {
+  app.get<{ Querystring: { institutionId?: string; page?: number; limit?: number } }>('/api/alunos', {
+    preHandler: [app.authenticate, requireRole('admin', 'professor')],
     schema: {
       tags: ['Alunos'],
-      summary: 'Lista alunos cadastrados',
+      summary: 'Lista alunos cadastrados (paginado)',
       querystring: {
         type: 'object',
-        properties: { institutionId: { type: 'string', format: 'uuid' } }
+        properties: {
+          institutionId: { type: 'string', format: 'uuid' },
+          page: { type: 'integer', minimum: 1, default: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 }
+        }
       },
-      response: { 200: { type: 'array', items: studentResponseSchema } }
+      response: { 200: paginatedStudentSchema }
     }
   }, async (request) => {
-    const students = await studentService.list(request.query.institutionId);
-    return toStudentListResponse(students);
+    const { institutionId, page = 1, limit = 50 } = request.query;
+    const result = await studentService.list(institutionId, page, limit);
+    return { ...result, data: toStudentListResponse(result.data) };
   });
 
   app.get<{ Params: { id: string } }>('/api/alunos/:id', {
+    preHandler: [app.authenticate, requireRole('admin', 'professor', 'student')],
     schema: {
       tags: ['Alunos'],
       summary: 'Consulta um aluno pelo identificador',
@@ -81,6 +100,7 @@ export async function studentRoutes(app: FastifyInstance) {
   });
 
   app.post<{ Body: CreateStudentInput }>('/api/alunos', {
+    preHandler: [app.authenticate, requireRole('admin')],
     schema: {
       tags: ['Alunos'],
       summary: 'Cadastra um aluno',
@@ -97,6 +117,7 @@ export async function studentRoutes(app: FastifyInstance) {
   });
 
   app.put<{ Params: { id: string }; Body: UpdateStudentInput }>('/api/alunos/:id', {
+    preHandler: [app.authenticate, requireRole('admin', 'student')],
     schema: {
       tags: ['Alunos'],
       summary: 'Atualiza um aluno',
@@ -115,6 +136,7 @@ export async function studentRoutes(app: FastifyInstance) {
   });
 
   app.delete<{ Params: { id: string } }>('/api/alunos/:id', {
+    preHandler: [app.authenticate, requireRole('admin')],
     schema: {
       tags: ['Alunos'],
       summary: 'Remove um aluno',

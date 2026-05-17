@@ -9,6 +9,7 @@ export async function professorActivationRoutes(app: FastifyInstance) {
   const authService = createAuthService(app);
 
   app.post<{ Body: { email: string } }>('/api/professores/ativar', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     schema: {
       tags: ['Professores'],
       summary: 'Solicita senha temporaria para ativar conta de professor',
@@ -31,6 +32,7 @@ export async function professorActivationRoutes(app: FastifyInstance) {
   });
 
   app.post<{ Body: { email: string; newPassword: string } }>('/api/auth/alterar-senha', {
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     schema: {
       tags: ['Auth'],
       summary: 'Troca senha temporaria por senha definitiva',

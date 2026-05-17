@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { EmailVO } from '../../../shared/domain/value-objects/email-vo.js';
 import { hashPassword } from '../../../shared/security/password-hasher.js';
+import { paginate, toPaginatedResult } from '../../../shared/pagination/pagination.js';
 
 export type CreatePartnerCompanyInput = {
   corporateName: string;
@@ -15,11 +16,18 @@ export type UpdatePartnerCompanyInput = Partial<CreatePartnerCompanyInput>;
 
 export function createPartnerCompanyService(app: FastifyInstance) {
   return {
-    list() {
-      return app.prisma.partnerCompany.findMany({
-        include: { user: true },
-        orderBy: { createdAt: 'desc' }
-      });
+    async list(page = 1, limit = 50) {
+      const p = paginate(page, limit);
+      const [data, total] = await Promise.all([
+        app.prisma.partnerCompany.findMany({
+          include: { user: true },
+          orderBy: { createdAt: 'desc' },
+          skip: p.skip,
+          take: p.take
+        }),
+        app.prisma.partnerCompany.count()
+      ]);
+      return toPaginatedResult(data, total, p.page, p.limit);
     },
 
     findById(id: string) {

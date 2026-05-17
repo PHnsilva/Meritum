@@ -22,13 +22,45 @@ export function clearStoredUser() {
 }
 
 export async function login(input: LoginInput) {
-  const response = await apiClient<{ user: AuthUser }>('/api/auth/login', {
+  const response = await apiClient<{ token: string; user: Omit<AuthUser, 'token'> }>('/api/auth/login', {
     method: 'POST',
     body: input
   });
 
-  storeUser(response.user);
-  return response.user;
+  const user: AuthUser = { ...response.user, token: response.token };
+  storeUser(user);
+  return user;
+}
+
+export async function refreshToken(): Promise<void> {
+  const user = getStoredUser();
+  if (!user?.token) return;
+  try {
+    const { token } = await apiClient<{ token: string }>('/api/auth/refresh', { method: 'POST' });
+    storeUser({ ...user, token });
+  } catch {
+    // Token expirado — deixa o usuario continuar; proximo 401 vai redirecionar para login
+  }
+}
+
+function getTokenExpiry(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1] ?? '')) as { exp?: number };
+    return payload.exp ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function refreshIfExpiringSoon(): Promise<void> {
+  const user = getStoredUser();
+  if (!user?.token) return;
+  const exp = getTokenExpiry(user.token);
+  if (!exp) return;
+  const oneHourMs = 60 * 60 * 1000;
+  if (exp - Date.now() < oneHourMs) {
+    await refreshToken();
+  }
 }
 
 export async function requestActivation(email: string) {

@@ -1,6 +1,7 @@
+import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from '../layouts/AppLayout';
-import { getStoredUser } from '../../modules/auth/services/authService';
+import { getStoredUser, refreshIfExpiringSoon } from '../../modules/auth/services/authService';
 import { LoginPage } from '../../modules/auth/pages/LoginPage';
 import { RegisterPage } from '../../modules/auth/pages/RegisterPage';
 import { ActivarContaPage } from '../../modules/auth/pages/ActivarContaPage';
@@ -29,6 +30,7 @@ import type { UserRole } from '../../shared/types/api';
 
 function ProtectedRoute() {
   const user = getStoredUser();
+  useEffect(() => { void refreshIfExpiringSoon(); }, []);
   if (!user) return <Navigate to="/login" replace />;
   if (user.mustChangePassword) return <Navigate to="/alterar-senha" replace />;
   return <AppLayout />;

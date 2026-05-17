@@ -1,8 +1,9 @@
 import { apiClient } from '../../../shared/http/apiClient';
 import type { CreateParceiroInput, Parceiro, UpdateParceiroInput } from '../types/parceiro';
 
-export function listParceiros() {
-  return apiClient<Parceiro[]>('/api/parceiros');
+export async function listParceiros(): Promise<Parceiro[]> {
+  const result = await apiClient<{ data: Parceiro[] }>('/api/parceiros?limit=200');
+  return result.data;
 }
 
 export function createParceiro(input: CreateParceiroInput) {

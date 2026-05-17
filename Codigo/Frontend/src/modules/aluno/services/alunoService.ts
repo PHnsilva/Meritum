@@ -1,9 +1,11 @@
 import { apiClient } from '../../../shared/http/apiClient';
 import type { Aluno, CreateAlunoInput, UpdateAlunoInput } from '../types/aluno';
 
-export function listAlunos(institutionId?: string) {
-  const qs = institutionId ? `?institutionId=${institutionId}` : '';
-  return apiClient<Aluno[]>(`/api/alunos${qs}`);
+export async function listAlunos(institutionId?: string): Promise<Aluno[]> {
+  const params = new URLSearchParams({ limit: '200' });
+  if (institutionId) params.set('institutionId', institutionId);
+  const result = await apiClient<{ data: Aluno[] }>(`/api/alunos?${params}`);
+  return result.data;
 }
 
 export function createAluno(input: CreateAlunoInput) {

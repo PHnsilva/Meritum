@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
+import { requireRole } from '../../../shared/auth/require-role.js';
 import { createInstitutionService, type CreateInstitutionInput, type UpdateInstitutionInput } from '../application/institution-service.js';
 import { toInstitutionListResponse, toInstitutionResponse } from '../responder/institution-responder.js';
 
@@ -31,9 +32,10 @@ export async function institutionRoutes(app: FastifyInstance) {
   const institutionService = createInstitutionService(app);
 
   app.get('/api/instituicoes', {
+    preHandler: [app.authenticate, requireRole('admin', 'professor', 'student', 'partner')],
     schema: {
       tags: ['Instituicoes'],
-      summary: 'Lista instituicoes de ensino cadastradas',
+      summary: 'Lista instituicoes de ensino (usada em selects)',
       response: { 200: { type: 'array', items: institutionResponseSchema } }
     }
   }, async () => {
@@ -41,6 +43,7 @@ export async function institutionRoutes(app: FastifyInstance) {
   });
 
   app.get<{ Params: { id: string } }>('/api/instituicoes/:id', {
+    preHandler: [app.authenticate, requireRole('admin', 'professor')],
     schema: {
       tags: ['Instituicoes'],
       summary: 'Consulta uma instituicao pelo identificador',
@@ -54,6 +57,7 @@ export async function institutionRoutes(app: FastifyInstance) {
   });
 
   app.post<{ Body: CreateInstitutionInput }>('/api/instituicoes', {
+    preHandler: [app.authenticate, requireRole('admin')],
     schema: {
       tags: ['Instituicoes'],
       summary: 'Cadastra uma instituicao de ensino',
@@ -70,6 +74,7 @@ export async function institutionRoutes(app: FastifyInstance) {
   });
 
   app.put<{ Params: { id: string }; Body: UpdateInstitutionInput }>('/api/instituicoes/:id', {
+    preHandler: [app.authenticate, requireRole('admin')],
     schema: {
       tags: ['Instituicoes'],
       summary: 'Atualiza uma instituicao de ensino',
@@ -88,6 +93,7 @@ export async function institutionRoutes(app: FastifyInstance) {
   });
 
   app.delete<{ Params: { id: string } }>('/api/instituicoes/:id', {
+    preHandler: [app.authenticate, requireRole('admin')],
     schema: {
       tags: ['Instituicoes'],
       summary: 'Remove uma instituicao de ensino',

@@ -11,4 +11,5 @@ export type AuthUser = {
   mustChangePassword: boolean;
   createdAt: string;
   updatedAt: string;
+  token: string;
 };

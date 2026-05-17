@@ -1,7 +1,8 @@
 import type { AuthUserResult } from '../application/auth-service.js';
 
-export function toAuthUserResponse(result: AuthUserResult) {
+export function toAuthUserResponse(result: AuthUserResult, token: string) {
   return {
+    token,
     user: {
       id: result.id,
       name: result.name,

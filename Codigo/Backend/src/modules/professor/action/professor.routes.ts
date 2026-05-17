@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
+import { requireRole } from '../../../shared/auth/require-role.js';
 import { createProfessorService, type CreateProfessorInput, type UpdateProfessorInput } from '../application/professor-service.js';
 import { toProfessorListResponse, toProfessorResponse } from '../responder/professor-responder.js';
 
@@ -44,20 +45,42 @@ const updateProfessorBodySchema = {
 
 const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
+const paginatedProfessorSchema = {
+  type: 'object',
+  properties: {
+    data: { type: 'array', items: professorResponseSchema },
+    total: { type: 'integer' },
+    page: { type: 'integer' },
+    limit: { type: 'integer' },
+    totalPages: { type: 'integer' }
+  }
+} as const;
+
 export async function professorRoutes(app: FastifyInstance) {
   const service = createProfessorService(app);
 
-  app.get('/api/professores', {
+  app.get<{ Querystring: { page?: number; limit?: number } }>('/api/professores', {
+    preHandler: [app.authenticate, requireRole('admin')],
     schema: {
       tags: ['Professores'],
-      summary: 'Lista professores cadastrados',
-      response: { 200: { type: 'array', items: professorResponseSchema } }
+      summary: 'Lista professores cadastrados (paginado)',
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1, default: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 }
+        }
+      },
+      response: { 200: paginatedProfessorSchema }
     }
-  }, async () => {
-    return toProfessorListResponse(await service.list());
+  }, async (request) => {
+    const { page = 1, limit = 50 } = request.query;
+    const result = await service.list(page, limit);
+    return { ...result, data: toProfessorListResponse(result.data) };
   });
 
   app.get<{ Params: { id: string } }>('/api/professores/:id', {
+    preHandler: [app.authenticate, requireRole('admin', 'professor')],
     schema: {
       tags: ['Professores'],
       summary: 'Consulta professor pelo identificador',
@@ -71,6 +94,7 @@ export async function professorRoutes(app: FastifyInstance) {
   });
 
   app.post<{ Body: CreateProfessorInput }>('/api/professores', {
+    preHandler: [app.authenticate, requireRole('admin')],
     schema: {
       tags: ['Professores'],
       summary: 'Cadastra um professor',
@@ -87,6 +111,7 @@ export async function professorRoutes(app: FastifyInstance) {
   });
 
   app.put<{ Params: { id: string }; Body: UpdateProfessorInput }>('/api/professores/:id', {
+    preHandler: [app.authenticate, requireRole('admin', 'professor')],
     schema: {
       tags: ['Professores'],
       summary: 'Atualiza um professor',
@@ -105,6 +130,7 @@ export async function professorRoutes(app: FastifyInstance) {
   });
 
   app.delete<{ Params: { id: string } }>('/api/professores/:id', {
+    preHandler: [app.authenticate, requireRole('admin')],
     schema: {
       tags: ['Professores'],
       summary: 'Remove um professor',

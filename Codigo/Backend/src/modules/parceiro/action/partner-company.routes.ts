@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
+import { requireRole } from '../../../shared/auth/require-role.js';
 import { createPartnerCompanyService, type CreatePartnerCompanyInput, type UpdatePartnerCompanyInput } from '../application/partner-company-service.js';
 import { toPartnerCompanyListResponse, toPartnerCompanyResponse } from '../responder/partner-company-responder.js';
 
@@ -38,20 +39,42 @@ const updatePartnerCompanyBodySchema = {
 
 const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
+const paginatedPartnerSchema = {
+  type: 'object',
+  properties: {
+    data: { type: 'array', items: partnerCompanyResponseSchema },
+    total: { type: 'integer' },
+    page: { type: 'integer' },
+    limit: { type: 'integer' },
+    totalPages: { type: 'integer' }
+  }
+} as const;
+
 export async function partnerCompanyRoutes(app: FastifyInstance) {
   const service = createPartnerCompanyService(app);
 
-  app.get('/api/parceiros', {
+  app.get<{ Querystring: { page?: number; limit?: number } }>('/api/parceiros', {
+    preHandler: [app.authenticate, requireRole('admin')],
     schema: {
       tags: ['Parceiros'],
-      summary: 'Lista empresas parceiras cadastradas',
-      response: { 200: { type: 'array', items: partnerCompanyResponseSchema } }
+      summary: 'Lista empresas parceiras cadastradas (paginado)',
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1, default: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 }
+        }
+      },
+      response: { 200: paginatedPartnerSchema }
     }
-  }, async () => {
-    return toPartnerCompanyListResponse(await service.list());
+  }, async (request) => {
+    const { page = 1, limit = 50 } = request.query;
+    const result = await service.list(page, limit);
+    return { ...result, data: toPartnerCompanyListResponse(result.data) };
   });
 
   app.get<{ Params: { id: string } }>('/api/parceiros/:id', {
+    preHandler: [app.authenticate, requireRole('admin', 'partner')],
     schema: {
       tags: ['Parceiros'],
       summary: 'Consulta uma empresa parceira pelo identificador',
@@ -65,6 +88,7 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
   });
 
   app.post<{ Body: CreatePartnerCompanyInput }>('/api/parceiros', {
+    preHandler: [app.authenticate, requireRole('admin')],
     schema: {
       tags: ['Parceiros'],
       summary: 'Cadastra uma empresa parceira',
@@ -81,6 +105,7 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
   });
 
   app.put<{ Params: { id: string }; Body: UpdatePartnerCompanyInput }>('/api/parceiros/:id', {
+    preHandler: [app.authenticate, requireRole('admin', 'partner')],
     schema: {
       tags: ['Parceiros'],
       summary: 'Atualiza uma empresa parceira',
@@ -99,6 +124,7 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
   });
 
   app.delete<{ Params: { id: string } }>('/api/parceiros/:id', {
+    preHandler: [app.authenticate, requireRole('admin')],
     schema: {
       tags: ['Parceiros'],
       summary: 'Remove uma empresa parceira',

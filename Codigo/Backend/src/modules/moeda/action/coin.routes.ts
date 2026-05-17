@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { sendCoinReceivedEmail, sendCoinSentConfirmationEmail } from '../../../shared/email/email-service.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
+import { requireRole } from '../../../shared/auth/require-role.js';
 import { createCoinService, type EnviarMoedasInput } from '../application/coin-service.js';
 import { toExtratoResponse, toTransactionResponse } from '../responder/coin-responder.js';
 
@@ -48,6 +49,7 @@ export async function coinRoutes(app: FastifyInstance) {
   const service = createCoinService(app);
 
   app.post<{ Body: EnviarMoedasInput }>('/api/moedas/enviar', {
+    preHandler: [app.authenticate, requireRole('professor')],
     schema: {
       tags: ['Moedas'],
       summary: 'UC05 - Professor envia moedas para aluno',
@@ -67,7 +69,6 @@ export async function coinRoutes(app: FastifyInstance) {
     try {
       const { transaction, event } = await service.enviarMoedas(request.body);
 
-      // Dispara emails em resposta ao evento — side effect fora do Domain
       void Promise.allSettled([
         sendCoinReceivedEmail({
           studentName: event.studentName,
@@ -92,6 +93,7 @@ export async function coinRoutes(app: FastifyInstance) {
   });
 
   app.get<{ Params: { professorId: string } }>('/api/moedas/extrato/professor/:professorId', {
+    preHandler: [app.authenticate, requireRole('admin', 'professor')],
     schema: {
       tags: ['Moedas'],
       summary: 'UC06 - Extrato do professor (envios realizados + saldo)',
@@ -112,6 +114,7 @@ export async function coinRoutes(app: FastifyInstance) {
   });
 
   app.get<{ Params: { studentId: string } }>('/api/moedas/extrato/aluno/:studentId', {
+    preHandler: [app.authenticate, requireRole('admin', 'student')],
     schema: {
       tags: ['Moedas'],
       summary: 'UC06 - Extrato do aluno (recebimentos + saldo)',
