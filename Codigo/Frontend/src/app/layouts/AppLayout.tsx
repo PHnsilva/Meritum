@@ -1,23 +1,47 @@
-import { Menu, School, LogOut, LayoutDashboard, GraduationCap, Building2, Gift, Coins, X, Landmark } from 'lucide-react';
+import { Menu, School, LogOut, LayoutDashboard, GraduationCap, Building2, Gift, Coins, X, Landmark, BookOpen, FileText } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 import { clearStoredUser, getStoredUser } from '../../modules/auth/services/authService';
 import { Button } from '../../shared/components/Button';
 import { ThemeToggle } from '../../shared/components/ThemeToggle';
+import type { UserRole } from '../../shared/types/api';
 
-const navItems = [
+type NavItem = { to: string; label: string; icon: React.ElementType };
+
+const navByRole: Record<UserRole, NavItem[]> = {
+  student: [
+    { to: '/', label: 'Painel', icon: LayoutDashboard },
+    { to: '/moedas/extrato/aluno', label: 'Meu Extrato', icon: FileText },
+    { to: '/vantagens', label: 'Vantagens', icon: Gift }
+  ],
+  professor: [
+    { to: '/', label: 'Painel', icon: LayoutDashboard },
+    { to: '/moedas', label: 'Enviar Moedas', icon: Coins },
+    { to: '/moedas/extrato/professor', label: 'Meu Extrato', icon: FileText }
+  ],
+  partner: [
+    { to: '/', label: 'Painel', icon: LayoutDashboard },
+    { to: '/vantagens', label: 'Vantagens', icon: Gift }
+  ]
+};
+
+const adminNav: NavItem[] = [
   { to: '/', label: 'Painel', icon: LayoutDashboard },
   { to: '/instituicoes', label: 'Instituicoes', icon: Landmark },
   { to: '/alunos', label: 'Alunos', icon: GraduationCap },
+  { to: '/professores', label: 'Professores', icon: BookOpen },
   { to: '/parceiros', label: 'Parceiros', icon: Building2 },
-  { to: '/vantagens', label: 'Vantagens', icon: Gift },
-  { to: '/moedas', label: 'Moedas', icon: Coins }
+  { to: '/moedas', label: 'Enviar Moedas', icon: Coins },
+  { to: '/moedas/extrato/professor', label: 'Extrato Prof.', icon: FileText },
+  { to: '/moedas/extrato/aluno', label: 'Extrato Aluno', icon: FileText },
+  { to: '/vantagens', label: 'Vantagens', icon: Gift }
 ];
 
 export function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
   const user = useMemo(() => getStoredUser(), []);
+  const navItems = user?.role ? (navByRole[user.role] ?? adminNav) : adminNav;
 
   function handleLogout() {
     clearStoredUser();
@@ -50,7 +74,7 @@ export function AppLayout() {
 
         <nav className="desktop-nav" aria-label="Navegacao principal">
           {navItems.map((item) => (
-            <NavLink key={item.to} to={item.to}>
+            <NavLink key={item.to} to={item.to} end={item.to === '/'}>
               <item.icon size={16} />
               {item.label}
             </NavLink>
@@ -64,7 +88,7 @@ export function AppLayout() {
             <X size={22} />
           </button>
           {navItems.map((item) => (
-            <NavLink key={item.to} to={item.to} onClick={() => setMenuOpen(false)}>
+            <NavLink key={item.to} to={item.to} end={item.to === '/'} onClick={() => setMenuOpen(false)}>
               <item.icon size={18} />
               {item.label}
             </NavLink>

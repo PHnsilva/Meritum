@@ -8,10 +8,6 @@ type LoginInput = {
   password: string;
 };
 
-type RegisterInput = LoginInput & {
-  name: string;
-};
-
 export function getStoredUser() {
   const rawUser = localStorage.getItem(STORAGE_KEY);
   return rawUser ? (JSON.parse(rawUser) as AuthUser) : null;
@@ -26,21 +22,11 @@ export function clearStoredUser() {
 }
 
 export async function login(input: LoginInput) {
-  const response = await apiClient<{ user: AuthUser }>('/users/login', {
+  const response = await apiClient<{ user: AuthUser }>('/api/auth/login', {
     method: 'POST',
     body: input
   });
 
   storeUser(response.user);
   return response.user;
-}
-
-export async function registerUser(input: RegisterInput) {
-  const user = await apiClient<AuthUser>('/users', {
-    method: 'POST',
-    body: input
-  });
-
-  storeUser(user);
-  return user;
 }

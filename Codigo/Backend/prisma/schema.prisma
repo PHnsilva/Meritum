@@ -7,55 +7,96 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  STUDENT
+  PROFESSOR
+  PARTNER
+
+  @@map("role")
+}
+
 model User {
-  id           String   @id @default(uuid())
-  name         String
-  email        String   @unique
-  passwordHash String?  @map("password_hash")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id             String          @id @default(uuid())
+  name           String
+  email          String          @unique
+  cpf            String?         @unique
+  passwordHash   String          @map("password_hash")
+  role           Role
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  student        Student?
+  professor      Professor?
+  partnerCompany PartnerCompany?
 
   @@map("users")
 }
 
 model Institution {
-  id        String    @id @default(uuid())
-  name      String    @unique
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  students  Student[]
+  id         String      @id @default(uuid())
+  name       String      @unique
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+  students   Student[]
+  professors Professor[]
 
   @@map("institutions")
 }
 
 model Student {
-  id            String      @id @default(uuid())
-  name          String
-  email         String      @unique
-  cpf           String      @unique
-  rg            String      @unique
-  address       String
-  course        String
-  passwordHash  String      @map("password_hash")
-  coinBalance   Int         @default(0) @map("coin_balance")
-  institutionId String      @map("institution_id")
-  institution   Institution @relation(fields: [institutionId], references: [id])
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
+  id                   String        @id @default(uuid())
+  userId               String        @unique @map("user_id")
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rg                   String        @unique
+  address              String
+  course               String
+  coinBalance          Int           @default(0) @map("coin_balance")
+  institutionId        String        @map("institution_id")
+  institution          Institution   @relation(fields: [institutionId], references: [id])
+  receivedTransactions Transaction[]
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
 
   @@map("students")
 }
 
+model Professor {
+  id            String        @id @default(uuid())
+  userId        String        @unique @map("user_id")
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department    String
+  coinBalance   Int           @default(1000) @map("coin_balance")
+  institutionId String        @map("institution_id")
+  institution   Institution   @relation(fields: [institutionId], references: [id])
+  transactions  Transaction[]
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  @@map("professors")
+}
+
 model PartnerCompany {
   id            String   @id @default(uuid())
+  userId        String   @unique @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   corporateName String   @map("corporate_name")
   tradeName     String?  @map("trade_name")
-  email         String   @unique
   cnpj          String   @unique
   address       String
-  passwordHash  String   @map("password_hash")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("partner_companies")
+}
+
+model Transaction {
+  id          String    @id @default(uuid())
+  amount      Int
+  motive      String
+  professorId String    @map("professor_id")
+  studentId   String    @map("student_id")
+  professor   Professor @relation(fields: [professorId], references: [id])
+  student     Student   @relation(fields: [studentId], references: [id])
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@map("transactions")
 }

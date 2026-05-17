@@ -1,22 +1,20 @@
 import type { FastifyInstance } from 'fastify';
 import { hashPassword } from '../../../shared/security/password-hasher.js';
 
-export type CreateStudentInput = {
+export type CreateProfessorInput = {
   name: string;
   email: string;
   cpf: string;
-  rg: string;
-  address: string;
+  department: string;
   institutionId: string;
-  course: string;
   password: string;
 };
 
-export type UpdateStudentInput = Partial<Omit<CreateStudentInput, 'password'>> & {
+export type UpdateProfessorInput = Partial<Omit<CreateProfessorInput, 'password'>> & {
   password?: string;
 };
 
-export function createStudentService(app: FastifyInstance) {
+export function createProfessorService(app: FastifyInstance) {
   async function ensureInstitutionExists(institutionId: string) {
     const institution = await app.prisma.institution.findUnique({ where: { id: institutionId } });
     if (!institution) {
@@ -28,20 +26,20 @@ export function createStudentService(app: FastifyInstance) {
 
   return {
     list() {
-      return app.prisma.student.findMany({
+      return app.prisma.professor.findMany({
         include: { user: true, institution: true },
         orderBy: { createdAt: 'desc' }
       });
     },
 
     findById(id: string) {
-      return app.prisma.student.findUnique({
+      return app.prisma.professor.findUnique({
         where: { id },
         include: { user: true, institution: true }
       });
     },
 
-    async create(input: CreateStudentInput) {
+    async create(input: CreateProfessorInput) {
       await ensureInstitutionExists(input.institutionId);
 
       return app.prisma.$transaction(async (tx) => {
@@ -51,16 +49,14 @@ export function createStudentService(app: FastifyInstance) {
             email: input.email,
             cpf: input.cpf,
             passwordHash: hashPassword(input.password),
-            role: 'STUDENT'
+            role: 'PROFESSOR'
           }
         });
 
-        return tx.student.create({
+        return tx.professor.create({
           data: {
             userId: user.id,
-            rg: input.rg,
-            address: input.address,
-            course: input.course,
+            department: input.department,
             institutionId: input.institutionId
           },
           include: { user: true, institution: true }
@@ -68,16 +64,16 @@ export function createStudentService(app: FastifyInstance) {
       });
     },
 
-    async update(id: string, input: UpdateStudentInput) {
+    async update(id: string, input: UpdateProfessorInput) {
       if (input.institutionId) await ensureInstitutionExists(input.institutionId);
 
-      const student = await app.prisma.student.findUnique({ where: { id }, include: { user: true } });
-      if (!student) return null;
+      const professor = await app.prisma.professor.findUnique({ where: { id }, include: { user: true } });
+      if (!professor) return null;
 
       return app.prisma.$transaction(async (tx) => {
         if (input.name || input.email || input.cpf || input.password) {
           await tx.user.update({
-            where: { id: student.userId },
+            where: { id: professor.userId },
             data: {
               ...(input.name ? { name: input.name } : {}),
               ...(input.email ? { email: input.email } : {}),
@@ -87,12 +83,10 @@ export function createStudentService(app: FastifyInstance) {
           });
         }
 
-        return tx.student.update({
+        return tx.professor.update({
           where: { id },
           data: {
-            ...(input.rg ? { rg: input.rg } : {}),
-            ...(input.address ? { address: input.address } : {}),
-            ...(input.course ? { course: input.course } : {}),
+            ...(input.department ? { department: input.department } : {}),
             ...(input.institutionId ? { institutionId: input.institutionId } : {})
           },
           include: { user: true, institution: true }
@@ -101,10 +95,10 @@ export function createStudentService(app: FastifyInstance) {
     },
 
     async delete(id: string) {
-      const student = await app.prisma.student.findUnique({ where: { id } });
-      if (!student) return null;
-      await app.prisma.user.delete({ where: { id: student.userId } });
-      return student;
+      const professor = await app.prisma.professor.findUnique({ where: { id } });
+      if (!professor) return null;
+      await app.prisma.user.delete({ where: { id: professor.userId } });
+      return professor;
     }
   };
 }
