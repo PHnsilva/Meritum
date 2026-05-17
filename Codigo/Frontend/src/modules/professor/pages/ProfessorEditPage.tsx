@@ -57,7 +57,6 @@ export function ProfessorEditPage() {
               institutionId: professor.institution.id
             }}
             submitLabel="Atualizar professor"
-            requirePassword={false}
             onSubmit={handleSubmit}
           />
         ) : null}

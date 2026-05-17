@@ -3,8 +3,11 @@ import { AppLayout } from '../layouts/AppLayout';
 import { getStoredUser } from '../../modules/auth/services/authService';
 import { LoginPage } from '../../modules/auth/pages/LoginPage';
 import { RegisterPage } from '../../modules/auth/pages/RegisterPage';
+import { ActivarContaPage } from '../../modules/auth/pages/ActivarContaPage';
+import { AlterarSenhaPage } from '../../modules/auth/pages/AlterarSenhaPage';
 import { DashboardPage } from '../../modules/dashboard/pages/DashboardPage';
 import { StudentDashboardPage } from '../../modules/dashboard/pages/StudentDashboardPage';
+import { ProfessorDashboardPage } from '../../modules/dashboard/pages/ProfessorDashboardPage';
 import { AlunoListPage } from '../../modules/aluno/pages/AlunoListPage';
 import { AlunoCreatePage } from '../../modules/aluno/pages/AlunoCreatePage';
 import { AlunoEditPage } from '../../modules/aluno/pages/AlunoEditPage';
@@ -17,6 +20,7 @@ import { ParceiroEditPage } from '../../modules/parceiro/pages/ParceiroEditPage'
 import { ProfessorListPage } from '../../modules/professor/pages/ProfessorListPage';
 import { ProfessorCreatePage } from '../../modules/professor/pages/ProfessorCreatePage';
 import { ProfessorEditPage } from '../../modules/professor/pages/ProfessorEditPage';
+import { PerfilPage } from '../../modules/auth/pages/PerfilPage';
 import { EnviarMoedasPage } from '../../modules/moeda/pages/EnviarMoedasPage';
 import { ExtratoProfessorPage } from '../../modules/moeda/pages/ExtratoProfessorPage';
 import { ExtratoAlunoPage } from '../../modules/moeda/pages/ExtratoAlunoPage';
@@ -24,7 +28,10 @@ import { PlaceholderPage } from '../../shared/components/PlaceholderPage';
 import type { UserRole } from '../../shared/types/api';
 
 function ProtectedRoute() {
-  return getStoredUser() ? <AppLayout /> : <Navigate to="/login" replace />;
+  const user = getStoredUser();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.mustChangePassword) return <Navigate to="/alterar-senha" replace />;
+  return <AppLayout />;
 }
 
 function RoleGuard({ blocked, children }: { blocked: UserRole[]; children: React.ReactNode }) {
@@ -36,17 +43,19 @@ function RoleGuard({ blocked, children }: { blocked: UserRole[]; children: React
 function HomeDashboard() {
   const user = getStoredUser();
   if (user?.role === 'student') return <StudentDashboardPage />;
+  if (user?.role === 'professor') return <ProfessorDashboardPage />;
   return <DashboardPage />;
 }
 
-const studentAndPartner: UserRole[] = ['student', 'professor'];
-const nonAdmin: UserRole[] = ['student', 'professor', 'partner'];
+const nonAdmin: UserRole[] = ['student', 'professor', 'partner']; // admin not blocked
 
 export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/cadastro" element={<RegisterPage />} />
+      <Route path="/ativar-conta" element={<ActivarContaPage />} />
+      <Route path="/alterar-senha" element={<AlterarSenhaPage />} />
       <Route element={<ProtectedRoute />}>
         <Route index element={<HomeDashboard />} />
 
@@ -66,12 +75,13 @@ export function AppRoutes() {
 
         {/* Professor routes */}
         <Route path="/moedas" element={<RoleGuard blocked={['student', 'partner']}><EnviarMoedasPage /></RoleGuard>} />
-        <Route path="/moedas/extrato/professor" element={<RoleGuard blocked={studentAndPartner}><ExtratoProfessorPage /></RoleGuard>} />
+        <Route path="/moedas/extrato/professor" element={<RoleGuard blocked={['student', 'partner']}><ExtratoProfessorPage /></RoleGuard>} />
 
         {/* Student routes */}
         <Route path="/moedas/extrato/aluno" element={<RoleGuard blocked={['professor', 'partner']}><ExtratoAlunoPage /></RoleGuard>} />
 
         {/* Shared */}
+        <Route path="/perfil" element={<PerfilPage />} />
         <Route path="/vantagens" element={<PlaceholderPage title="Vantagens" />} />
       </Route>
     </Routes>

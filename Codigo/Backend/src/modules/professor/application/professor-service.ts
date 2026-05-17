@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { hashPassword } from '../../../shared/security/password-hasher.js';
+import { generateTempPassword, hashPassword } from '../../../shared/security/password-hasher.js';
 
 export type CreateProfessorInput = {
   name: string;
@@ -7,12 +7,9 @@ export type CreateProfessorInput = {
   cpf: string;
   department: string;
   institutionId: string;
-  password: string;
 };
 
-export type UpdateProfessorInput = Partial<Omit<CreateProfessorInput, 'password'>> & {
-  password?: string;
-};
+export type UpdateProfessorInput = Partial<CreateProfessorInput>;
 
 export function createProfessorService(app: FastifyInstance) {
   async function ensureInstitutionExists(institutionId: string) {
@@ -48,7 +45,8 @@ export function createProfessorService(app: FastifyInstance) {
             name: input.name,
             email: input.email,
             cpf: input.cpf,
-            passwordHash: hashPassword(input.password),
+            passwordHash: hashPassword(generateTempPassword()),
+            mustChangePassword: true,
             role: 'PROFESSOR'
           }
         });
@@ -71,14 +69,13 @@ export function createProfessorService(app: FastifyInstance) {
       if (!professor) return null;
 
       return app.prisma.$transaction(async (tx) => {
-        if (input.name || input.email || input.cpf || input.password) {
+        if (input.name || input.email || input.cpf) {
           await tx.user.update({
             where: { id: professor.userId },
             data: {
               ...(input.name ? { name: input.name } : {}),
               ...(input.email ? { email: input.email } : {}),
-              ...(input.cpf ? { cpf: input.cpf } : {}),
-              ...(input.password ? { passwordHash: hashPassword(input.password) } : {})
+              ...(input.cpf ? { cpf: input.cpf } : {})
             }
           });
         }

@@ -11,9 +11,8 @@ import type { Instituicao } from '../../instituicao/types/instituicao';
 import type { CreateProfessorInput, UpdateProfessorInput } from '../types/professor';
 
 type ProfessorFormProps = {
-  initialValue?: Omit<CreateProfessorInput, 'password'>;
+  initialValue?: Partial<CreateProfessorInput>;
   submitLabel?: string;
-  requirePassword?: boolean;
   onSubmit: (input: CreateProfessorInput | UpdateProfessorInput) => Promise<void>;
 };
 
@@ -22,12 +21,11 @@ const initialState: CreateProfessorInput = {
   email: '',
   cpf: '',
   department: '',
-  institutionId: '',
-  password: ''
+  institutionId: ''
 };
 
-export function ProfessorForm({ initialValue, submitLabel = 'Salvar professor', requirePassword = true, onSubmit }: ProfessorFormProps) {
-  const [form, setForm] = useState<CreateProfessorInput>({ ...initialState, ...initialValue, password: '' });
+export function ProfessorForm({ initialValue, submitLabel = 'Salvar professor', onSubmit }: ProfessorFormProps) {
+  const [form, setForm] = useState<CreateProfessorInput>({ ...initialState, ...initialValue });
   const [instituicoes, setInstituicoes] = useState<Instituicao[]>([]);
   const [loadingInstituicoes, setLoadingInstituicoes] = useState(true);
   const [error, setError] = useState('');
@@ -69,24 +67,9 @@ export function ProfessorForm({ initialValue, submitLabel = 'Salvar professor', 
       return;
     }
 
-    if (requirePassword && form.password.length < 6) {
-      setError('Informe uma senha com pelo menos 6 caracteres');
-      return;
-    }
-
     try {
       setLoading(true);
-      const payload: CreateProfessorInput | UpdateProfessorInput = {
-        ...form,
-        email: form.email.trim(),
-        cpf: onlyDigits(form.cpf)
-      };
-
-      if (!form.password) {
-        delete payload.password;
-      }
-
-      await onSubmit(payload);
+      await onSubmit({ ...form, email: form.email.trim(), cpf: onlyDigits(form.cpf) });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Nao foi possivel salvar o professor');
     } finally {
@@ -118,15 +101,9 @@ export function ProfessorForm({ initialValue, submitLabel = 'Salvar professor', 
         disabled={loadingInstituicoes || instituicoes.length === 0}
         required
       />
-      <TextField
-        label={requirePassword ? 'Senha' : 'Nova senha'}
-        type="password"
-        minLength={6}
-        value={form.password}
-        onChange={(e) => updateField('password', e.target.value)}
-        hint={requirePassword ? undefined : 'Preencha apenas se desejar alterar a senha'}
-        required={requirePassword}
-      />
+      <p style={{ fontSize: '0.8125rem', color: 'var(--text-2)', margin: 0 }}>
+        O professor receberá a senha por email ao ativar a conta.
+      </p>
       <div className="form-grid__actions">
         <Button type="submit" icon={<Save size={16} />} disabled={loading}>
           {loading ? 'Salvando...' : submitLabel}

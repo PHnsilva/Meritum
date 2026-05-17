@@ -77,6 +77,9 @@ export async function coinRoutes(app: FastifyInstance) {
       if (error.name === 'ProfessorNotFoundError' || error.name === 'StudentNotFoundError') {
         return reply.status(404).send({ message: error.message });
       }
+      if (error.name === 'DifferentInstitutionError') {
+        return reply.status(400).send({ message: error.message });
+      }
       throw error;
     }
   });

@@ -8,6 +8,7 @@ datasource db {
 }
 
 enum Role {
+  ADMIN
   STUDENT
   PROFESSOR
   PARTNER
@@ -20,9 +21,10 @@ model User {
   name           String
   email          String          @unique
   cpf            String?         @unique
-  passwordHash   String          @map("password_hash")
-  role           Role
-  createdAt      DateTime        @default(now()) @map("created_at")
+  passwordHash       String          @map("password_hash")
+  role               Role
+  mustChangePassword Boolean         @default(false) @map("must_change_password")
+  createdAt          DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
   student        Student?
   professor      Professor?

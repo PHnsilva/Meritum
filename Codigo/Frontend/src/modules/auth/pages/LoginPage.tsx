@@ -1,4 +1,4 @@
-import { LogIn, School, UserPlus } from 'lucide-react';
+import { LogIn, School, UserPlus, KeyRound } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Alert } from '../../../shared/components/Alert';
@@ -70,10 +70,14 @@ export function LoginPage() {
           </Button>
         </form>
 
-        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+        <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
           <Link to="/cadastro" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.875rem' }}>
             <UserPlus size={14} />
             Sou aluno e nao tenho conta — cadastrar
+          </Link>
+          <Link to="/ativar-conta" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.875rem' }}>
+            <KeyRound size={14} />
+            Sou professor — ativar minha conta
           </Link>
         </div>
       </section>

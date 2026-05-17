@@ -1,8 +1,9 @@
 import { apiClient } from '../../../shared/http/apiClient';
 import type { Aluno, CreateAlunoInput, UpdateAlunoInput } from '../types/aluno';
 
-export function listAlunos() {
-  return apiClient<Aluno[]>('/api/alunos');
+export function listAlunos(institutionId?: string) {
+  const qs = institutionId ? `?institutionId=${institutionId}` : '';
+  return apiClient<Aluno[]>(`/api/alunos${qs}`);
 }
 
 export function createAluno(input: CreateAlunoInput) {

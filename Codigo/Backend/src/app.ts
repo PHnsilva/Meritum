@@ -7,6 +7,7 @@ import { institutionRoutes } from './modules/instituicao/action/institution.rout
 import { studentRoutes } from './modules/aluno/action/student.routes.js';
 import { partnerCompanyRoutes } from './modules/parceiro/action/partner-company.routes.js';
 import { professorRoutes } from './modules/professor/action/professor.routes.js';
+import { professorActivationRoutes } from './modules/professor/action/professor-activation.routes.js';
 import { authRoutes } from './modules/auth/action/auth.routes.js';
 import { coinRoutes } from './modules/moeda/action/coin.routes.js';
 
@@ -28,6 +29,7 @@ export async function buildApp() {
   await app.register(studentRoutes);
   await app.register(partnerCompanyRoutes);
   await app.register(professorRoutes);
+  await app.register(professorActivationRoutes);
   await app.register(coinRoutes);
 
   return app;

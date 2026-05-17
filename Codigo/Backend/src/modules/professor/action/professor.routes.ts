@@ -26,14 +26,13 @@ const professorResponseSchema = {
 
 const professorBodySchema = {
   type: 'object',
-  required: ['name', 'email', 'cpf', 'department', 'institutionId', 'password'],
+  required: ['name', 'email', 'cpf', 'department', 'institutionId'],
   properties: {
     name: { type: 'string', minLength: 2 },
     email: { type: 'string', format: 'email' },
     cpf: { type: 'string', minLength: 11 },
     department: { type: 'string', minLength: 2 },
-    institutionId: { type: 'string', format: 'uuid' },
-    password: { type: 'string', minLength: 6 }
+    institutionId: { type: 'string', format: 'uuid' }
   }
 } as const;
 

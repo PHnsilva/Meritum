@@ -16,7 +16,6 @@ export type CreateProfessorInput = {
   cpf: string;
   department: string;
   institutionId: string;
-  password: string;
 };
 
 export type UpdateProfessorInput = Partial<CreateProfessorInput>;

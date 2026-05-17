@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { verifyPassword } from '../../../shared/security/password-hasher.js';
 
 type LoginBody = { email: string; password: string };
+type PerfilBody = { entityId: string; name?: string; email?: string };
 
 const authResponseSchema = {
   type: 'object',
@@ -12,8 +13,9 @@ const authResponseSchema = {
         id: { type: 'string' },
         name: { type: 'string' },
         email: { type: 'string' },
-        role: { type: 'string', enum: ['student', 'professor', 'partner'] },
+        role: { type: 'string', enum: ['admin', 'student', 'professor', 'partner'] },
         coinBalance: { type: 'integer', nullable: true },
+        mustChangePassword: { type: 'boolean' },
         createdAt: { type: 'string', format: 'date-time' },
         updatedAt: { type: 'string', format: 'date-time' }
       }
@@ -61,9 +63,41 @@ export async function authRoutes(app: FastifyInstance) {
         email: user.email,
         role: user.role.toLowerCase(),
         coinBalance,
+        mustChangePassword: user.mustChangePassword,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       }
     };
+  });
+
+  app.put<{ Body: PerfilBody }>('/api/auth/perfil', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Atualizar perfil do administrador',
+      body: {
+        type: 'object',
+        required: ['entityId'],
+        properties: {
+          entityId: { type: 'string' },
+          name: { type: 'string', minLength: 1 },
+          email: { type: 'string', format: 'email' }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    const { entityId, name, email } = request.body;
+
+    const user = await app.prisma.user.findUnique({ where: { id: entityId } });
+    if (!user) return reply.status(404).send({ message: 'Usuario nao encontrado' });
+
+    await app.prisma.user.update({
+      where: { id: entityId },
+      data: {
+        ...(name ? { name } : {}),
+        ...(email ? { email } : {})
+      }
+    });
+
+    return { message: 'Perfil atualizado com sucesso' };
   });
 }

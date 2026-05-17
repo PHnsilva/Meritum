@@ -37,6 +37,12 @@ export function createCoinService(app: FastifyInstance) {
         throw err;
       }
 
+      if (professor.institutionId !== student.institutionId) {
+        const err = new Error('Professor e aluno nao pertencem a mesma instituicao');
+        err.name = 'DifferentInstitutionError';
+        throw err;
+      }
+
       const transaction = await app.prisma.$transaction(async (tx) => {
         await tx.professor.update({
           where: { id: input.professorId },

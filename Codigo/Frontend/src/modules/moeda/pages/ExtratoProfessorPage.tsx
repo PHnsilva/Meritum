@@ -5,31 +5,22 @@ import { Alert } from '../../../shared/components/Alert';
 import { Button } from '../../../shared/components/Button';
 import { PageHeader } from '../../../shared/components/PageHeader';
 import { SelectField } from '../../../shared/components/SelectField';
+import { getStoredUser } from '../../auth/services/authService';
 import { listProfessores } from '../../professor/services/professorService';
 import type { Professor } from '../../professor/types/professor';
 import { getExtratoProfessor } from '../services/moedaService';
 import type { ExtratoResponse } from '../types/moeda';
 
 export function ExtratoProfessorPage() {
+  const storedUser = getStoredUser();
+  const isProfessor = storedUser?.role === 'professor';
+
   const [professores, setProfessores] = useState<Professor[]>([]);
-  const [professorId, setProfessorId] = useState('');
+  const [professorId, setProfessorId] = useState(isProfessor ? storedUser.id : '');
   const [extrato, setExtrato] = useState<ExtratoResponse | null>(null);
-  const [loadingProfs, setLoadingProfs] = useState(true);
+  const [loadingProfs, setLoadingProfs] = useState(!isProfessor);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    async function load() {
-      try {
-        setProfessores(await listProfessores());
-      } catch {
-        setError('Nao foi possivel carregar professores');
-      } finally {
-        setLoadingProfs(false);
-      }
-    }
-    void load();
-  }, []);
 
   async function loadExtrato(id: string) {
     if (!id) return;
@@ -45,6 +36,23 @@ export function ExtratoProfessorPage() {
     }
   }
 
+  useEffect(() => {
+    if (isProfessor) {
+      void loadExtrato(storedUser.id);
+      return;
+    }
+    async function loadProfs() {
+      try {
+        setProfessores(await listProfessores());
+      } catch {
+        setError('Nao foi possivel carregar professores');
+      } finally {
+        setLoadingProfs(false);
+      }
+    }
+    void loadProfs();
+  }, []);
+
   function handleProfessorChange(id: string) {
     setProfessorId(id);
     void loadExtrato(id);
@@ -53,31 +61,35 @@ export function ExtratoProfessorPage() {
   return (
     <section className="stack">
       <PageHeader
-        title="Extrato do Professor"
+        title={isProfessor ? 'Meu Extrato' : 'Extrato do Professor'}
         description="UC06 — Historico de envios de moedas e saldo atual."
         actions={
           <>
             <Button variant="secondary" icon={<RefreshCw size={16} />} onClick={() => void loadExtrato(professorId)} disabled={!professorId}>
               Atualizar
             </Button>
-            <Link className="button button--secondary" to="/">
-              <ArrowLeft size={16} />
-              <span>Voltar</span>
-            </Link>
+            {!isProfessor && (
+              <Link className="button button--secondary" to="/">
+                <ArrowLeft size={16} />
+                <span>Voltar</span>
+              </Link>
+            )}
           </>
         }
       />
 
-      <section className="work-panel">
-        <SelectField
-          label="Selecione o professor"
-          value={professorId}
-          onChange={(e) => handleProfessorChange(e.target.value)}
-          placeholder={loadingProfs ? 'Carregando...' : 'Selecione o professor'}
-          options={professores.map((p) => ({ value: p.id, label: `${p.name} — ${p.institution.name}` }))}
-          disabled={loadingProfs}
-        />
-      </section>
+      {!isProfessor && (
+        <section className="work-panel">
+          <SelectField
+            label="Selecione o professor"
+            value={professorId}
+            onChange={(e) => handleProfessorChange(e.target.value)}
+            placeholder={loadingProfs ? 'Carregando...' : 'Selecione o professor'}
+            options={professores.map((p) => ({ value: p.id, label: `${p.name} — ${p.institution.name}` }))}
+            disabled={loadingProfs}
+          />
+        </section>
+      )}
 
       {error ? <Alert tone="error">{error}</Alert> : null}
 
@@ -92,7 +104,7 @@ export function ExtratoProfessorPage() {
             {extrato.transactions.length === 0 ? (
               <div className="empty-state">
                 <strong>Nenhum envio registrado</strong>
-                <span>Este professor ainda nao enviou moedas.</span>
+                <span>Voce ainda nao enviou moedas.</span>
               </div>
             ) : (
               <div className="responsive-table">

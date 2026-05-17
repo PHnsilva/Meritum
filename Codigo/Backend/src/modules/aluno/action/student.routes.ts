@@ -60,10 +60,14 @@ const conflictSchema = {
 export async function studentRoutes(app: FastifyInstance) {
   const studentService = createStudentService(app);
 
-  app.get('/api/alunos', {
+  app.get<{ Querystring: { institutionId?: string } }>('/api/alunos', {
     schema: {
       tags: ['Alunos'],
       summary: 'Lista alunos cadastrados',
+      querystring: {
+        type: 'object',
+        properties: { institutionId: { type: 'string', format: 'uuid' } }
+      },
       response: {
         200: {
           type: 'array',
@@ -71,8 +75,8 @@ export async function studentRoutes(app: FastifyInstance) {
         }
       }
     }
-  }, async () => {
-    const students = await studentService.list();
+  }, async (request) => {
+    const students = await studentService.list(request.query.institutionId);
     return toStudentListResponse(students);
   });
 

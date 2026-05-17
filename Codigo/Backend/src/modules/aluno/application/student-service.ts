@@ -27,8 +27,9 @@ export function createStudentService(app: FastifyInstance) {
   }
 
   return {
-    list() {
+    list(institutionId?: string) {
       return app.prisma.student.findMany({
+        where: institutionId ? { institutionId } : undefined,
         include: { user: true, institution: true },
         orderBy: { createdAt: 'desc' }
       });
