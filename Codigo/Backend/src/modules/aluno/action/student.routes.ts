@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
+import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { createStudentService, type CreateStudentInput, type UpdateStudentInput } from '../application/student-service.js';
 import { toStudentListResponse, toStudentResponse } from '../responder/student-responder.js';
-import { isUniqueConstraintError } from '../../../shared/prisma/prisma-errors.js';
 
 const studentResponseSchema = {
   type: 'object',
@@ -47,15 +47,7 @@ const updateStudentBodySchema = {
   properties: studentBodySchema.properties
 } as const;
 
-const notFoundSchema = {
-  type: 'object',
-  properties: { message: { type: 'string' } }
-} as const;
-
-const conflictSchema = {
-  type: 'object',
-  properties: { message: { type: 'string' } }
-} as const;
+const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
 export async function studentRoutes(app: FastifyInstance) {
   const studentService = createStudentService(app);
@@ -68,12 +60,7 @@ export async function studentRoutes(app: FastifyInstance) {
         type: 'object',
         properties: { institutionId: { type: 'string', format: 'uuid' } }
       },
-      response: {
-        200: {
-          type: 'array',
-          items: studentResponseSchema
-        }
-      }
+      response: { 200: { type: 'array', items: studentResponseSchema } }
     }
   }, async (request) => {
     const students = await studentService.list(request.query.institutionId);
@@ -84,23 +71,12 @@ export async function studentRoutes(app: FastifyInstance) {
     schema: {
       tags: ['Alunos'],
       summary: 'Consulta um aluno pelo identificador',
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'string', format: 'uuid' } }
-      },
-      response: {
-        200: studentResponseSchema,
-        404: notFoundSchema
-      }
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
+      response: { 200: studentResponseSchema, 404: errorSchema }
     }
   }, async (request, reply) => {
     const student = await studentService.findById(request.params.id);
-
-    if (!student) {
-      return reply.status(404).send({ message: 'Aluno nao encontrado' });
-    }
-
+    if (!student) return reply.status(404).send({ message: 'Aluno nao encontrado' });
     return toStudentResponse(student);
   });
 
@@ -109,26 +85,14 @@ export async function studentRoutes(app: FastifyInstance) {
       tags: ['Alunos'],
       summary: 'Cadastra um aluno',
       body: studentBodySchema,
-      response: {
-        201: studentResponseSchema,
-        404: notFoundSchema,
-        409: conflictSchema
-      }
+      response: { 201: studentResponseSchema, 404: errorSchema, 409: errorSchema }
     }
   }, async (request, reply) => {
     try {
       const student = await studentService.create(request.body);
       return reply.status(201).send(toStudentResponse(student));
     } catch (error) {
-      if (error instanceof Error && error.name === 'InstitutionNotFoundError') {
-        return reply.status(404).send({ message: error.message });
-      }
-
-      if (isUniqueConstraintError(error)) {
-        return reply.status(409).send({ message: 'Aluno ja cadastrado com email, CPF ou RG informado' });
-      }
-
-      throw error;
+      return sendErrorResponse(reply, error, 'Aluno ja cadastrado com email, CPF ou RG informado');
     }
   });
 
@@ -136,37 +100,17 @@ export async function studentRoutes(app: FastifyInstance) {
     schema: {
       tags: ['Alunos'],
       summary: 'Atualiza um aluno',
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'string', format: 'uuid' } }
-      },
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
       body: updateStudentBodySchema,
-      response: {
-        200: studentResponseSchema,
-        404: notFoundSchema,
-        409: conflictSchema
-      }
+      response: { 200: studentResponseSchema, 404: errorSchema, 409: errorSchema }
     }
   }, async (request, reply) => {
     try {
       const student = await studentService.update(request.params.id, request.body);
-
-      if (!student) {
-        return reply.status(404).send({ message: 'Aluno nao encontrado' });
-      }
-
+      if (!student) return reply.status(404).send({ message: 'Aluno nao encontrado' });
       return toStudentResponse(student);
     } catch (error) {
-      if (error instanceof Error && error.name === 'InstitutionNotFoundError') {
-        return reply.status(404).send({ message: error.message });
-      }
-
-      if (isUniqueConstraintError(error)) {
-        return reply.status(409).send({ message: 'Aluno ja cadastrado com email, CPF ou RG informado' });
-      }
-
-      throw error;
+      return sendErrorResponse(reply, error, 'Aluno ja cadastrado com email, CPF ou RG informado');
     }
   });
 
@@ -174,23 +118,12 @@ export async function studentRoutes(app: FastifyInstance) {
     schema: {
       tags: ['Alunos'],
       summary: 'Remove um aluno',
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'string', format: 'uuid' } }
-      },
-      response: {
-        204: { type: 'null' },
-        404: notFoundSchema
-      }
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
+      response: { 204: { type: 'null' }, 404: errorSchema }
     }
   }, async (request, reply) => {
     const student = await studentService.delete(request.params.id);
-
-    if (!student) {
-      return reply.status(404).send({ message: 'Aluno nao encontrado' });
-    }
-
+    if (!student) return reply.status(404).send({ message: 'Aluno nao encontrado' });
     return reply.status(204).send();
   });
 }

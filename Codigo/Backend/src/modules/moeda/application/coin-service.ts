@@ -1,5 +1,9 @@
 import type { FastifyInstance } from 'fastify';
-import { sendCoinReceivedEmail, sendCoinSentConfirmationEmail } from '../../../shared/email/email-service.js';
+import { MoedasEnviadasEvent } from '../../../shared/domain/events/moedas-enviadas-event.js';
+import { DomainErrors } from '../../../shared/errors/domain-errors.js';
+import { CoinBalance } from '../../../shared/domain/value-objects/coin-balance.js';
+import { createProfessorService } from '../../professor/application/professor-service.js';
+import { createStudentService } from '../../aluno/application/student-service.js';
 
 export type EnviarMoedasInput = {
   professorId: string;
@@ -8,39 +12,24 @@ export type EnviarMoedasInput = {
   motive: string;
 };
 
+
 export function createCoinService(app: FastifyInstance) {
+  const professorService = createProfessorService(app);
+  const studentService = createStudentService(app);
+
   return {
     async enviarMoedas(input: EnviarMoedasInput) {
-      const professor = await app.prisma.professor.findUnique({
-        where: { id: input.professorId },
-        include: { user: true }
-      });
-      if (!professor) {
-        const err = new Error('Professor nao encontrado');
-        err.name = 'ProfessorNotFoundError';
-        throw err;
-      }
+      const professor = await professorService.findById(input.professorId);
+      if (!professor) throw DomainErrors.professorNotFound();
 
-      if (professor.coinBalance < input.amount) {
-        const err = new Error('Saldo insuficiente para realizar o envio');
-        err.name = 'InsufficientBalanceError';
-        throw err;
-      }
+      const balance = CoinBalance.create(professor.coinBalance);
+      balance.deduct(input.amount);
 
-      const student = await app.prisma.student.findUnique({
-        where: { id: input.studentId },
-        include: { user: true }
-      });
-      if (!student) {
-        const err = new Error('Aluno nao encontrado');
-        err.name = 'StudentNotFoundError';
-        throw err;
-      }
+      const student = await studentService.findById(input.studentId);
+      if (!student) throw DomainErrors.studentNotFound();
 
       if (professor.institutionId !== student.institutionId) {
-        const err = new Error('Professor e aluno nao pertencem a mesma instituicao');
-        err.name = 'DifferentInstitutionError';
-        throw err;
+        throw DomainErrors.differentInstitution();
       }
 
       const transaction = await app.prisma.$transaction(async (tx) => {
@@ -48,12 +37,10 @@ export function createCoinService(app: FastifyInstance) {
           where: { id: input.professorId },
           data: { coinBalance: { decrement: input.amount } }
         });
-
         await tx.student.update({
           where: { id: input.studentId },
           data: { coinBalance: { increment: input.amount } }
         });
-
         return tx.transaction.create({
           data: {
             amount: input.amount,
@@ -68,36 +55,23 @@ export function createCoinService(app: FastifyInstance) {
         });
       });
 
-      await Promise.allSettled([
-        sendCoinReceivedEmail({
-          studentName: student.user.name,
-          studentEmail: student.user.email,
-          professorName: professor.user.name,
-          amount: input.amount,
-          motive: input.motive
-        }),
-        sendCoinSentConfirmationEmail({
-          professorName: professor.user.name,
-          professorEmail: professor.user.email,
-          studentName: student.user.name,
-          amount: input.amount,
-          motive: input.motive
-        })
-      ]);
+      const event = new MoedasEnviadasEvent(
+        input.professorId,
+        professor.user.name,
+        professor.user.email,
+        input.studentId,
+        student.user.name,
+        student.user.email,
+        input.amount,
+        input.motive
+      );
 
-      return transaction;
+      return { transaction, event };
     },
 
     async extratoProfessor(professorId: string) {
-      const professor = await app.prisma.professor.findUnique({
-        where: { id: professorId },
-        include: { user: true }
-      });
-      if (!professor) {
-        const err = new Error('Professor nao encontrado');
-        err.name = 'ProfessorNotFoundError';
-        throw err;
-      }
+      const professor = await professorService.findById(professorId);
+      if (!professor) throw DomainErrors.professorNotFound();
 
       const transactions = await app.prisma.transaction.findMany({
         where: { professorId },
@@ -109,15 +83,8 @@ export function createCoinService(app: FastifyInstance) {
     },
 
     async extratoAluno(studentId: string) {
-      const student = await app.prisma.student.findUnique({
-        where: { id: studentId },
-        include: { user: true }
-      });
-      if (!student) {
-        const err = new Error('Aluno nao encontrado');
-        err.name = 'StudentNotFoundError';
-        throw err;
-      }
+      const student = await studentService.findById(studentId);
+      if (!student) throw DomainErrors.studentNotFound();
 
       const transactions = await app.prisma.transaction.findMany({
         where: { studentId },

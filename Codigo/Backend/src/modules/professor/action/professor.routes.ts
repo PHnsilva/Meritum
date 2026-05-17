@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
+import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { createProfessorService, type CreateProfessorInput, type UpdateProfessorInput } from '../application/professor-service.js';
 import { toProfessorListResponse, toProfessorResponse } from '../responder/professor-responder.js';
-import { isUniqueConstraintError } from '../../../shared/prisma/prisma-errors.js';
 
 const professorResponseSchema = {
   type: 'object',
@@ -42,8 +42,7 @@ const updateProfessorBodySchema = {
   properties: professorBodySchema.properties
 } as const;
 
-const notFoundSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
-const conflictSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
+const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
 export async function professorRoutes(app: FastifyInstance) {
   const service = createProfessorService(app);
@@ -55,8 +54,7 @@ export async function professorRoutes(app: FastifyInstance) {
       response: { 200: { type: 'array', items: professorResponseSchema } }
     }
   }, async () => {
-    const professors = await service.list();
-    return toProfessorListResponse(professors);
+    return toProfessorListResponse(await service.list());
   });
 
   app.get<{ Params: { id: string } }>('/api/professores/:id', {
@@ -64,7 +62,7 @@ export async function professorRoutes(app: FastifyInstance) {
       tags: ['Professores'],
       summary: 'Consulta professor pelo identificador',
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
-      response: { 200: professorResponseSchema, 404: notFoundSchema }
+      response: { 200: professorResponseSchema, 404: errorSchema }
     }
   }, async (request, reply) => {
     const professor = await service.findById(request.params.id);
@@ -77,20 +75,14 @@ export async function professorRoutes(app: FastifyInstance) {
       tags: ['Professores'],
       summary: 'Cadastra um professor',
       body: professorBodySchema,
-      response: { 201: professorResponseSchema, 404: notFoundSchema, 409: conflictSchema }
+      response: { 201: professorResponseSchema, 404: errorSchema, 409: errorSchema }
     }
   }, async (request, reply) => {
     try {
       const professor = await service.create(request.body);
       return reply.status(201).send(toProfessorResponse(professor));
     } catch (error) {
-      if (error instanceof Error && error.name === 'InstitutionNotFoundError') {
-        return reply.status(404).send({ message: error.message });
-      }
-      if (isUniqueConstraintError(error)) {
-        return reply.status(409).send({ message: 'Professor ja cadastrado com email ou CPF informado' });
-      }
-      throw error;
+      return sendErrorResponse(reply, error, 'Professor ja cadastrado com email ou CPF informado');
     }
   });
 
@@ -100,7 +92,7 @@ export async function professorRoutes(app: FastifyInstance) {
       summary: 'Atualiza um professor',
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
       body: updateProfessorBodySchema,
-      response: { 200: professorResponseSchema, 404: notFoundSchema, 409: conflictSchema }
+      response: { 200: professorResponseSchema, 404: errorSchema, 409: errorSchema }
     }
   }, async (request, reply) => {
     try {
@@ -108,13 +100,7 @@ export async function professorRoutes(app: FastifyInstance) {
       if (!professor) return reply.status(404).send({ message: 'Professor nao encontrado' });
       return toProfessorResponse(professor);
     } catch (error) {
-      if (error instanceof Error && error.name === 'InstitutionNotFoundError') {
-        return reply.status(404).send({ message: error.message });
-      }
-      if (isUniqueConstraintError(error)) {
-        return reply.status(409).send({ message: 'Professor ja cadastrado com email ou CPF informado' });
-      }
-      throw error;
+      return sendErrorResponse(reply, error, 'Professor ja cadastrado com email ou CPF informado');
     }
   });
 
@@ -123,7 +109,7 @@ export async function professorRoutes(app: FastifyInstance) {
       tags: ['Professores'],
       summary: 'Remove um professor',
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
-      response: { 204: { type: 'null' }, 404: notFoundSchema }
+      response: { 204: { type: 'null' }, 404: errorSchema }
     }
   }, async (request, reply) => {
     const professor = await service.delete(request.params.id);

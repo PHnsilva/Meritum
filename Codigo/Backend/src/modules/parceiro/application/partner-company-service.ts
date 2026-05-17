@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { EmailVO } from '../../../shared/domain/value-objects/email-vo.js';
 import { hashPassword } from '../../../shared/security/password-hasher.js';
 
 export type CreatePartnerCompanyInput = {
@@ -29,6 +30,7 @@ export function createPartnerCompanyService(app: FastifyInstance) {
     },
 
     create(input: CreatePartnerCompanyInput) {
+      EmailVO.create(input.email);
       return app.prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
           data: {
@@ -53,6 +55,7 @@ export function createPartnerCompanyService(app: FastifyInstance) {
     },
 
     async update(id: string, input: UpdatePartnerCompanyInput) {
+      if (input.email) EmailVO.create(input.email);
       const partnerCompany = await app.prisma.partnerCompany.findUnique({ where: { id }, include: { user: true } });
       if (!partnerCompany) return null;
 

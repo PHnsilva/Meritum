@@ -1,10 +1,13 @@
 import type { FastifyInstance } from 'fastify';
-import { generateTempPassword, hashPassword } from '../../../shared/security/password-hasher.js';
+import { createAuthService } from '../../auth/application/auth-service.js';
+import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { sendProfessorActivationEmail } from '../../../shared/email/email-service.js';
 
 const messageSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
 export async function professorActivationRoutes(app: FastifyInstance) {
+  const authService = createAuthService(app);
+
   app.post<{ Body: { email: string } }>('/api/professores/ativar', {
     schema: {
       tags: ['Professores'],
@@ -17,20 +20,13 @@ export async function professorActivationRoutes(app: FastifyInstance) {
       response: { 200: messageSchema }
     }
   }, async (request) => {
-    const { email } = request.body;
+    const result = await authService.requestActivation(request.body.email);
 
-    const user = await app.prisma.user.findUnique({ where: { email } });
-
-    if (user && user.role === 'PROFESSOR') {
-      const tempPassword = generateTempPassword();
-      await app.prisma.user.update({
-        where: { id: user.id },
-        data: { passwordHash: hashPassword(tempPassword), mustChangePassword: true }
-      });
-      await sendProfessorActivationEmail(user.email, user.name, tempPassword);
+    // Dispara email apenas se professor existir — nunca vaza a existência do email
+    if (result) {
+      void sendProfessorActivationEmail(result.userEmail, result.userName, result.tempPassword);
     }
 
-    // Sempre retorna a mesma mensagem para não vazar existência do email
     return { message: 'Se o email estiver cadastrado, voce recebera a senha temporaria em instantes.' };
   });
 
@@ -49,18 +45,11 @@ export async function professorActivationRoutes(app: FastifyInstance) {
       response: { 200: messageSchema, 404: messageSchema }
     }
   }, async (request, reply) => {
-    const { email, newPassword } = request.body;
-
-    const user = await app.prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      return reply.status(404).send({ message: 'Usuario nao encontrado' });
+    try {
+      await authService.changePassword(request.body);
+      return { message: 'Senha alterada com sucesso' };
+    } catch (error) {
+      return sendErrorResponse(reply, error);
     }
-
-    await app.prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash: hashPassword(newPassword), mustChangePassword: false }
-    });
-
-    return { message: 'Senha alterada com sucesso' };
   });
 }

@@ -1,5 +1,9 @@
 import type { FastifyInstance } from 'fastify';
+import { CPF } from '../../../shared/domain/value-objects/cpf.js';
+import { EmailVO } from '../../../shared/domain/value-objects/email-vo.js';
+import { DomainErrors } from '../../../shared/errors/domain-errors.js';
 import { generateTempPassword, hashPassword } from '../../../shared/security/password-hasher.js';
+import { createInstitutionService } from '../../instituicao/application/institution-service.js';
 
 export type CreateProfessorInput = {
   name: string;
@@ -12,14 +16,7 @@ export type CreateProfessorInput = {
 export type UpdateProfessorInput = Partial<CreateProfessorInput>;
 
 export function createProfessorService(app: FastifyInstance) {
-  async function ensureInstitutionExists(institutionId: string) {
-    const institution = await app.prisma.institution.findUnique({ where: { id: institutionId } });
-    if (!institution) {
-      const error = new Error('Instituicao de ensino nao encontrada');
-      error.name = 'InstitutionNotFoundError';
-      throw error;
-    }
-  }
+  const institutionService = createInstitutionService(app);
 
   return {
     list() {
@@ -37,7 +34,9 @@ export function createProfessorService(app: FastifyInstance) {
     },
 
     async create(input: CreateProfessorInput) {
-      await ensureInstitutionExists(input.institutionId);
+      EmailVO.create(input.email);
+      CPF.create(input.cpf);
+      await institutionService.findByIdOrThrow(input.institutionId);
 
       return app.prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
@@ -63,7 +62,9 @@ export function createProfessorService(app: FastifyInstance) {
     },
 
     async update(id: string, input: UpdateProfessorInput) {
-      if (input.institutionId) await ensureInstitutionExists(input.institutionId);
+      if (input.email) EmailVO.create(input.email);
+      if (input.cpf) CPF.create(input.cpf);
+      if (input.institutionId) await institutionService.findByIdOrThrow(input.institutionId);
 
       const professor = await app.prisma.professor.findUnique({ where: { id }, include: { user: true } });
       if (!professor) return null;

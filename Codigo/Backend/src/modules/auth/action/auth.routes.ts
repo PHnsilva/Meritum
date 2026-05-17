@@ -1,10 +1,9 @@
 import type { FastifyInstance } from 'fastify';
-import { verifyPassword } from '../../../shared/security/password-hasher.js';
+import { createAuthService, type LoginInput, type UpdatePerfilInput } from '../application/auth-service.js';
+import { toAuthUserResponse } from '../responder/auth-responder.js';
+import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 
-type LoginBody = { email: string; password: string };
-type PerfilBody = { entityId: string; name?: string; email?: string };
-
-const authResponseSchema = {
+const authUserSchema = {
   type: 'object',
   properties: {
     user: {
@@ -23,11 +22,17 @@ const authResponseSchema = {
   }
 } as const;
 
+const messageSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
+
+type PerfilBody = { entityId: string } & UpdatePerfilInput;
+
 export async function authRoutes(app: FastifyInstance) {
-  app.post<{ Body: LoginBody }>('/api/auth/login', {
+  const authService = createAuthService(app);
+
+  app.post<{ Body: LoginInput }>('/api/auth/login', {
     schema: {
       tags: ['Auth'],
-      summary: 'Login unificado para aluno, professor e empresa parceira',
+      summary: 'Login unificado para todos os perfis',
       body: {
         type: 'object',
         required: ['email', 'password'],
@@ -37,37 +42,14 @@ export async function authRoutes(app: FastifyInstance) {
         }
       },
       response: {
-        200: authResponseSchema,
-        401: { type: 'object', properties: { message: { type: 'string' } } }
+        200: authUserSchema,
+        401: messageSchema
       }
     }
   }, async (request, reply) => {
-    const { email, password } = request.body;
-
-    const user = await app.prisma.user.findUnique({
-      where: { email },
-      include: { student: true, professor: true, partnerCompany: true }
-    });
-
-    if (!user || !verifyPassword(password, user.passwordHash)) {
-      return reply.status(401).send({ message: 'Email ou senha invalidos' });
-    }
-
-    const coinBalance = user.student?.coinBalance ?? user.professor?.coinBalance ?? null;
-    const entityId = user.student?.id ?? user.professor?.id ?? user.partnerCompany?.id ?? user.id;
-
-    return {
-      user: {
-        id: entityId,
-        name: user.name,
-        email: user.email,
-        role: user.role.toLowerCase(),
-        coinBalance,
-        mustChangePassword: user.mustChangePassword,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt
-      }
-    };
+    const result = await authService.login(request.body);
+    if (!result) return reply.status(401).send({ message: 'Email ou senha invalidos' });
+    return toAuthUserResponse(result);
   });
 
   app.put<{ Body: PerfilBody }>('/api/auth/perfil', {
@@ -82,22 +64,19 @@ export async function authRoutes(app: FastifyInstance) {
           name: { type: 'string', minLength: 1 },
           email: { type: 'string', format: 'email' }
         }
+      },
+      response: {
+        200: messageSchema,
+        404: messageSchema
       }
     }
   }, async (request, reply) => {
-    const { entityId, name, email } = request.body;
-
-    const user = await app.prisma.user.findUnique({ where: { id: entityId } });
-    if (!user) return reply.status(404).send({ message: 'Usuario nao encontrado' });
-
-    await app.prisma.user.update({
-      where: { id: entityId },
-      data: {
-        ...(name ? { name } : {}),
-        ...(email ? { email } : {})
-      }
-    });
-
-    return { message: 'Perfil atualizado com sucesso' };
+    try {
+      const { entityId, ...data } = request.body;
+      await authService.updateAdminPerfil(entityId, data);
+      return { message: 'Perfil atualizado com sucesso' };
+    } catch (error) {
+      return sendErrorResponse(reply, error);
+    }
   });
 }

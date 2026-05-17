@@ -1,4 +1,6 @@
 import type { FastifyInstance } from 'fastify';
+import { sendCoinReceivedEmail, sendCoinSentConfirmationEmail } from '../../../shared/email/email-service.js';
+import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { createCoinService, type EnviarMoedasInput } from '../application/coin-service.js';
 import { toExtratoResponse, toTransactionResponse } from '../responder/coin-responder.js';
 
@@ -59,28 +61,33 @@ export async function coinRoutes(app: FastifyInstance) {
           motive: { type: 'string', minLength: 1 }
         }
       },
-      response: {
-        201: transactionSchema,
-        400: errorSchema,
-        404: errorSchema
-      }
+      response: { 201: transactionSchema, 400: errorSchema, 404: errorSchema }
     }
   }, async (request, reply) => {
     try {
-      const tx = await service.enviarMoedas(request.body);
-      return reply.status(201).send(toTransactionResponse(tx));
+      const { transaction, event } = await service.enviarMoedas(request.body);
+
+      // Dispara emails em resposta ao evento — side effect fora do Domain
+      void Promise.allSettled([
+        sendCoinReceivedEmail({
+          studentName: event.studentName,
+          studentEmail: event.studentEmail,
+          professorName: event.professorName,
+          amount: event.amount,
+          motive: event.motive
+        }),
+        sendCoinSentConfirmationEmail({
+          professorName: event.professorName,
+          professorEmail: event.professorEmail,
+          studentName: event.studentName,
+          amount: event.amount,
+          motive: event.motive
+        })
+      ]);
+
+      return reply.status(201).send(toTransactionResponse(transaction));
     } catch (error) {
-      if (!(error instanceof Error)) throw error;
-      if (error.name === 'InsufficientBalanceError') {
-        return reply.status(400).send({ message: error.message });
-      }
-      if (error.name === 'ProfessorNotFoundError' || error.name === 'StudentNotFoundError') {
-        return reply.status(404).send({ message: error.message });
-      }
-      if (error.name === 'DifferentInstitutionError') {
-        return reply.status(400).send({ message: error.message });
-      }
-      throw error;
+      return sendErrorResponse(reply, error);
     }
   });
 
@@ -100,10 +107,7 @@ export async function coinRoutes(app: FastifyInstance) {
       const data = await service.extratoProfessor(request.params.professorId);
       return toExtratoResponse(data);
     } catch (error) {
-      if (error instanceof Error && error.name === 'ProfessorNotFoundError') {
-        return reply.status(404).send({ message: error.message });
-      }
-      throw error;
+      return sendErrorResponse(reply, error);
     }
   });
 
@@ -123,10 +127,7 @@ export async function coinRoutes(app: FastifyInstance) {
       const data = await service.extratoAluno(request.params.studentId);
       return toExtratoResponse(data);
     } catch (error) {
-      if (error instanceof Error && error.name === 'StudentNotFoundError') {
-        return reply.status(404).send({ message: error.message });
-      }
-      throw error;
+      return sendErrorResponse(reply, error);
     }
   });
 }
