@@ -3,15 +3,19 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert } from '../../../shared/components/Alert';
 import { Button } from '../../../shared/components/Button';
+import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { PageHeader } from '../../../shared/components/PageHeader';
+import { SearchInput } from '../../../shared/components/SearchInput';
 import { formatCpf } from '../../../shared/utils/formatters';
 import { deleteProfessor, listProfessores } from '../services/professorService';
 import type { Professor } from '../types/professor';
 
 export function ProfessorListPage() {
   const [professores, setProfessores] = useState<Professor[]>([]);
+  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -25,8 +29,10 @@ export function ProfessorListPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!window.confirm('Deseja remover este professor?')) return;
+  async function handleDeleteConfirmed() {
+    if (!confirmDeleteId) return;
+    const id = confirmDeleteId;
+    setConfirmDeleteId(null);
     try {
       await deleteProfessor(id);
       await load();
@@ -37,7 +43,27 @@ export function ProfessorListPage() {
 
   useEffect(() => { void load(); }, []);
 
+  const q = query.toLowerCase();
+  const filtered = professores.filter(
+    (p) =>
+      p.name.toLowerCase().includes(q) ||
+      p.email.toLowerCase().includes(q) ||
+      p.department.toLowerCase().includes(q) ||
+      p.institution.name.toLowerCase().includes(q)
+  );
+
   return (
+    <>
+      {confirmDeleteId && (
+        <ConfirmModal
+          title="Remover professor"
+          message="Deseja remover este professor? A acao nao pode ser desfeita."
+          confirmLabel="Remover"
+          danger
+          onConfirm={() => void handleDeleteConfirmed()}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
     <section className="stack">
       <PageHeader
         title="Professores"
@@ -57,13 +83,17 @@ export function ProfessorListPage() {
 
       {error ? <Alert tone="error">{error}</Alert> : null}
 
+      <div className="work-panel" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <SearchInput value={query} onChange={setQuery} placeholder="Buscar por nome, email, departamento ou instituicao..." />
+      </div>
+
       <div className="table-card">
         {loading ? (
           <div className="empty-state">Carregando professores...</div>
-        ) : professores.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="empty-state">
-            <strong>Nenhum professor cadastrado</strong>
-            <span>Use o botao novo professor para iniciar o cadastro.</span>
+            <strong>{professores.length === 0 ? 'Nenhum professor cadastrado' : 'Nenhum resultado para a busca'}</strong>
+            <span>{professores.length === 0 ? 'Use o botao novo professor para iniciar o cadastro.' : 'Tente outros termos.'}</span>
           </div>
         ) : (
           <div className="responsive-table">
@@ -79,7 +109,7 @@ export function ProfessorListPage() {
                 </tr>
               </thead>
               <tbody>
-                {professores.map((professor) => (
+                {filtered.map((professor) => (
                   <tr key={professor.id}>
                     <td>
                       <strong>{professor.name}</strong>
@@ -102,7 +132,7 @@ export function ProfessorListPage() {
                         <button
                           className="icon-button icon-button--danger"
                           type="button"
-                          onClick={() => void handleDelete(professor.id)}
+                          onClick={() => setConfirmDeleteId(professor.id)}
                           aria-label="Remover professor"
                         >
                           <Trash2 size={16} />
@@ -117,5 +147,6 @@ export function ProfessorListPage() {
         )}
       </div>
     </section>
+    </>
   );
 }

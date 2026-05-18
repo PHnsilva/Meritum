@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { PrismaClient } from '@prisma/client';
 import { generateTempPassword, hashPassword, verifyPassword } from '../../../shared/security/password-hasher.js';
 import { DomainErrors } from '../../../shared/errors/domain-errors.js';
 
@@ -19,15 +19,19 @@ export type UpdatePerfilInput = { name?: string; email?: string };
 export type ChangePasswordInput = { email: string; newPassword: string };
 export type ActivationResult = { tempPassword: string; userName: string; userEmail: string };
 
-export function createAuthService(app: FastifyInstance) {
+export function createAuthService(prisma: PrismaClient) {
   return {
     async login(input: LoginInput): Promise<AuthUserResult | null> {
-      const user = await app.prisma.user.findUnique({
+      const user = await prisma.user.findUnique({
         where: { email: input.email },
         include: { student: true, professor: true, partnerCompany: true }
       });
 
       if (!user || !verifyPassword(input.password, user.passwordHash)) return null;
+
+      if (user.role === 'PARTNER' && user.partnerCompany?.status === 'PENDING') {
+        throw DomainErrors.accountPending();
+      }
 
       const coinBalance = user.student?.coinBalance ?? user.professor?.coinBalance ?? null;
       const entityId = user.student?.id ?? user.professor?.id ?? user.partnerCompany?.id ?? user.id;
@@ -45,10 +49,10 @@ export function createAuthService(app: FastifyInstance) {
     },
 
     async updateAdminPerfil(entityId: string, data: UpdatePerfilInput): Promise<void> {
-      const user = await app.prisma.user.findUnique({ where: { id: entityId } });
+      const user = await prisma.user.findUnique({ where: { id: entityId } });
       if (!user) throw DomainErrors.userNotFound();
 
-      await app.prisma.user.update({
+      await prisma.user.update({
         where: { id: entityId },
         data: {
           ...(data.name ? { name: data.name } : {}),
@@ -58,21 +62,21 @@ export function createAuthService(app: FastifyInstance) {
     },
 
     async changePassword(input: ChangePasswordInput): Promise<void> {
-      const user = await app.prisma.user.findUnique({ where: { email: input.email } });
+      const user = await prisma.user.findUnique({ where: { email: input.email } });
       if (!user) throw DomainErrors.userNotFound();
 
-      await app.prisma.user.update({
+      await prisma.user.update({
         where: { id: user.id },
         data: { passwordHash: hashPassword(input.newPassword), mustChangePassword: false }
       });
     },
 
     async requestActivation(email: string): Promise<ActivationResult | null> {
-      const user = await app.prisma.user.findUnique({ where: { email } });
+      const user = await prisma.user.findUnique({ where: { email } });
       if (!user || user.role !== 'PROFESSOR') return null;
 
       const tempPassword = generateTempPassword();
-      await app.prisma.user.update({
+      await prisma.user.update({
         where: { id: user.id },
         data: { passwordHash: hashPassword(tempPassword), mustChangePassword: true }
       });

@@ -7,8 +7,11 @@ const domainErrorStatus: Record<string, number> = {
   InstitutionNotFoundError: 404,
   UserNotFoundError: 404,
   PartnerNotFoundError: 404,
+  AdvantageNotFoundError: 404,
   InsufficientBalanceError: 400,
   DifferentInstitutionError: 400,
+  AdvantageInactiveError: 400,
+  AdvantageOwnershipError: 403,
   ValidationError: 422,
 };
 

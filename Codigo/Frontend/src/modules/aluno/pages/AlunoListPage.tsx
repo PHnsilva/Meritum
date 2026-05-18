@@ -3,15 +3,19 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert } from '../../../shared/components/Alert';
 import { Button } from '../../../shared/components/Button';
+import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { PageHeader } from '../../../shared/components/PageHeader';
+import { SearchInput } from '../../../shared/components/SearchInput';
 import { formatCpf } from '../../../shared/utils/formatters';
 import { deleteAluno, listAlunos } from '../services/alunoService';
 import type { Aluno } from '../types/aluno';
 
 export function AlunoListPage() {
   const [alunos, setAlunos] = useState<Aluno[]>([]);
+  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   async function loadAlunos() {
     setLoading(true);
@@ -26,11 +30,10 @@ export function AlunoListPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!window.confirm('Deseja remover este aluno?')) {
-      return;
-    }
-
+  async function handleDeleteConfirmed() {
+    if (!confirmDeleteId) return;
+    const id = confirmDeleteId;
+    setConfirmDeleteId(null);
     try {
       await deleteAluno(id);
       await loadAlunos();
@@ -43,7 +46,27 @@ export function AlunoListPage() {
     void loadAlunos();
   }, []);
 
+  const q = query.toLowerCase();
+  const filtered = alunos.filter(
+    (a) =>
+      a.name.toLowerCase().includes(q) ||
+      a.email.toLowerCase().includes(q) ||
+      a.course.toLowerCase().includes(q) ||
+      a.institution.name.toLowerCase().includes(q)
+  );
+
   return (
+    <>
+      {confirmDeleteId && (
+        <ConfirmModal
+          title="Remover aluno"
+          message="Deseja remover este aluno? A acao nao pode ser desfeita."
+          confirmLabel="Remover"
+          danger
+          onConfirm={() => void handleDeleteConfirmed()}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
     <section className="stack">
       <PageHeader
         title="Alunos"
@@ -63,13 +86,17 @@ export function AlunoListPage() {
 
       {error ? <Alert tone="error">{error}</Alert> : null}
 
+      <div className="work-panel" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <SearchInput value={query} onChange={setQuery} placeholder="Buscar por nome, email, curso ou instituicao..." />
+      </div>
+
       <div className="table-card">
         {loading ? (
           <div className="empty-state">Carregando alunos...</div>
-        ) : alunos.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="empty-state">
-            <strong>Nenhum aluno cadastrado</strong>
-            <span>Use o botao novo aluno para iniciar o cadastro.</span>
+            <strong>{alunos.length === 0 ? 'Nenhum aluno cadastrado' : 'Nenhum resultado para a busca'}</strong>
+            <span>{alunos.length === 0 ? 'Use o botao novo aluno para iniciar o cadastro.' : 'Tente outros termos.'}</span>
           </div>
         ) : (
           <div className="responsive-table">
@@ -85,7 +112,7 @@ export function AlunoListPage() {
                 </tr>
               </thead>
               <tbody>
-                {alunos.map((aluno) => (
+                {filtered.map((aluno) => (
                   <tr key={aluno.id}>
                     <td>
                       <strong>{aluno.name}</strong>
@@ -100,7 +127,7 @@ export function AlunoListPage() {
                         <Link className="icon-button" to={`/alunos/${aluno.id}/editar`} aria-label="Editar aluno">
                           <Edit3 size={16} />
                         </Link>
-                        <button className="icon-button icon-button--danger" type="button" onClick={() => void handleDelete(aluno.id)} aria-label="Remover aluno">
+                        <button className="icon-button icon-button--danger" type="button" onClick={() => setConfirmDeleteId(aluno.id)} aria-label="Remover aluno">
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -113,5 +140,6 @@ export function AlunoListPage() {
         )}
       </div>
     </section>
+    </>
   );
 }

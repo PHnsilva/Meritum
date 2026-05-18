@@ -1,5 +1,4 @@
 import type { FastifyInstance } from 'fastify';
-import { sendCoinReceivedEmail, sendCoinSentConfirmationEmail } from '../../../shared/email/email-service.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
 import { createCoinService, type EnviarMoedasInput } from '../application/coin-service.js';
@@ -46,18 +45,17 @@ const extratoSchema = {
 const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
 export async function coinRoutes(app: FastifyInstance) {
-  const service = createCoinService(app);
+  const service = createCoinService(app.prisma);
 
-  app.post<{ Body: EnviarMoedasInput }>('/api/moedas/enviar', {
+  app.post<{ Body: Omit<EnviarMoedasInput, 'professorId'> }>('/api/moedas/enviar', {
     preHandler: [app.authenticate, requireRole('professor')],
     schema: {
       tags: ['Moedas'],
       summary: 'UC05 - Professor envia moedas para aluno',
       body: {
         type: 'object',
-        required: ['professorId', 'studentId', 'amount', 'motive'],
+        required: ['studentId', 'amount', 'motive'],
         properties: {
-          professorId: { type: 'string', format: 'uuid' },
           studentId: { type: 'string', format: 'uuid' },
           amount: { type: 'integer', minimum: 1 },
           motive: { type: 'string', minLength: 1 }
@@ -67,25 +65,8 @@ export async function coinRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const { transaction, event } = await service.enviarMoedas(request.body);
-
-      void Promise.allSettled([
-        sendCoinReceivedEmail({
-          studentName: event.studentName,
-          studentEmail: event.studentEmail,
-          professorName: event.professorName,
-          amount: event.amount,
-          motive: event.motive
-        }),
-        sendCoinSentConfirmationEmail({
-          professorName: event.professorName,
-          professorEmail: event.professorEmail,
-          studentName: event.studentName,
-          amount: event.amount,
-          motive: event.motive
-        })
-      ]);
-
+      const { sub } = request.user as { sub: string };
+      const transaction = await service.enviarMoedas({ ...request.body, professorId: sub });
       return reply.status(201).send(toTransactionResponse(transaction));
     } catch (error) {
       return sendErrorResponse(reply, error);
@@ -102,10 +83,14 @@ export async function coinRoutes(app: FastifyInstance) {
         required: ['professorId'],
         properties: { professorId: { type: 'string', format: 'uuid' } }
       },
-      response: { 200: extratoSchema, 404: errorSchema }
+      response: { 200: extratoSchema, 403: errorSchema, 404: errorSchema }
     }
   }, async (request, reply) => {
     try {
+      const { sub, role } = request.user as { sub: string; role: string };
+      if (role === 'professor' && sub !== request.params.professorId) {
+        return reply.status(403).send({ message: 'Acesso negado: voce so pode ver seu proprio extrato' });
+      }
       const data = await service.extratoProfessor(request.params.professorId);
       return toExtratoResponse(data);
     } catch (error) {

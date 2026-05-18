@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Alert } from '../../../shared/components/Alert';
 import { Button } from '../../../shared/components/Button';
 import { PageHeader } from '../../../shared/components/PageHeader';
+import { SearchInput } from '../../../shared/components/SearchInput';
 import { SelectField } from '../../../shared/components/SelectField';
 import { getStoredUser } from '../../auth/services/authService';
 import { listProfessores } from '../../professor/services/professorService';
@@ -18,6 +19,7 @@ export function ExtratoProfessorPage() {
   const [professores, setProfessores] = useState<Professor[]>([]);
   const [professorId, setProfessorId] = useState(isProfessor ? storedUser.id : '');
   const [extrato, setExtrato] = useState<ExtratoResponse | null>(null);
+  const [query, setQuery] = useState('');
   const [loadingProfs, setLoadingProfs] = useState(!isProfessor);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -95,16 +97,29 @@ export function ExtratoProfessorPage() {
 
       {extrato ? (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px', background: 'var(--surface-2)', borderRadius: 8 }}>
-            <Coins size={20} />
-            <span style={{ fontSize: '1.1rem' }}>Saldo atual: <strong>{extrato.coinBalance} moedas</strong></span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '1rem 1.25rem', background: 'var(--color-surface)', border: '1px solid var(--color-line)', borderRadius: 8 }}>
+            <Coins size={20} style={{ color: 'var(--color-puc-blue)' }} />
+            <span style={{ fontSize: '1.1rem', color: 'var(--color-ink)' }}>Saldo atual: <strong>{extrato.coinBalance} moedas</strong></span>
           </div>
 
+          {extrato.transactions.length > 0 && (
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <SearchInput value={query} onChange={setQuery} placeholder="Buscar por aluno ou motivo..." />
+            </div>
+          )}
+
           <div className="table-card">
-            {extrato.transactions.length === 0 ? (
+            {(() => {
+              const q = query.toLowerCase();
+              const filtered = extrato.transactions.filter(
+                (tx) =>
+                  (tx.student?.name ?? '').toLowerCase().includes(q) ||
+                  tx.motive.toLowerCase().includes(q)
+              );
+              return filtered.length === 0 ? (
               <div className="empty-state">
-                <strong>Nenhum envio registrado</strong>
-                <span>Voce ainda nao enviou moedas.</span>
+                <strong>{extrato.transactions.length === 0 ? 'Nenhum envio registrado' : 'Nenhum resultado para a busca'}</strong>
+                <span>{extrato.transactions.length === 0 ? 'Voce ainda nao enviou moedas.' : 'Tente outros termos.'}</span>
               </div>
             ) : (
               <div className="responsive-table">
@@ -119,7 +134,7 @@ export function ExtratoProfessorPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {extrato.transactions.map((tx) => (
+                    {filtered.map((tx) => (
                       <tr key={tx.id}>
                         <td>{new Date(tx.createdAt).toLocaleString('pt-BR')}</td>
                         <td>
@@ -138,7 +153,8 @@ export function ExtratoProfessorPage() {
                   </tbody>
                 </table>
               </div>
-            )}
+            );
+            })()}
           </div>
         </>
       ) : null}

@@ -55,6 +55,7 @@ model Student {
   institutionId        String        @map("institution_id")
   institution          Institution   @relation(fields: [institutionId], references: [id])
   receivedTransactions Transaction[]
+  redemptions          Redemption[]
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt            DateTime      @updatedAt @map("updated_at")
 
@@ -76,18 +77,56 @@ model Professor {
   @@map("professors")
 }
 
+enum PartnerStatus {
+  PENDING
+  APPROVED
+
+  @@map("partner_status")
+}
+
 model PartnerCompany {
-  id            String   @id @default(uuid())
-  userId        String   @unique @map("user_id")
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  corporateName String   @map("corporate_name")
-  tradeName     String?  @map("trade_name")
-  cnpj          String   @unique
+  id            String        @id @default(uuid())
+  userId        String        @unique @map("user_id")
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  corporateName String        @map("corporate_name")
+  tradeName     String?       @map("trade_name")
+  cnpj          String        @unique
   address       String
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  status        PartnerStatus @default(APPROVED) @map("status")
+  advantages    Advantage[]
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
 
   @@map("partner_companies")
+}
+
+model Advantage {
+  id          String         @id @default(uuid())
+  title       String
+  description String
+  imageUrl    String?        @map("image_url")
+  costInCoins Int            @map("cost_in_coins")
+  isActive    Boolean        @default(true) @map("is_active")
+  partnerId   String         @map("partner_id")
+  partner     PartnerCompany @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  redemptions Redemption[]
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  @@map("advantages")
+}
+
+model Redemption {
+  id          String    @id @default(uuid())
+  code        String    @unique
+  coinCost    Int       @map("coin_cost")
+  studentId   String    @map("student_id")
+  student     Student   @relation(fields: [studentId], references: [id])
+  advantageId String    @map("advantage_id")
+  advantage   Advantage @relation(fields: [advantageId], references: [id])
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@map("redemptions")
 }
 
 model Transaction {

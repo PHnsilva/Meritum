@@ -6,7 +6,7 @@ import { Button } from '../../../shared/components/Button';
 import { PageHeader } from '../../../shared/components/PageHeader';
 import { SelectField } from '../../../shared/components/SelectField';
 import { TextField } from '../../../shared/components/TextField';
-import { getStoredUser } from '../../auth/services/authService';
+import { getStoredUser, updateStoredCoinBalance } from '../../auth/services/authService';
 import { listAlunos } from '../../aluno/services/alunoService';
 import type { Aluno } from '../../aluno/types/aluno';
 import { getProfessor, listProfessores } from '../../professor/services/professorService';
@@ -82,13 +82,14 @@ export function EnviarMoedasPage() {
 
     try {
       setLoading(true);
-      await enviarMoedas({ professorId, studentId, amount: amountNum, motive: motive.trim() });
+      await enviarMoedas({ studentId, amount: amountNum, motive: motive.trim() });
       setSuccess(`${amountNum} moedas enviadas com sucesso! O aluno sera notificado por email.`);
       setStudentId('');
       setAmount('');
       setMotive('');
       if (isProfessor) {
         setCoinBalance((prev) => (prev !== null ? prev - amountNum : null));
+        updateStoredCoinBalance(-amountNum);
       } else {
         const profs = await listProfessores();
         setProfessores(profs);
@@ -120,7 +121,7 @@ export function EnviarMoedasPage() {
         {success ? <Alert tone="success">{success}</Alert> : null}
 
         {displayBalance !== null ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, padding: '12px 16px', background: 'var(--surface-2)', borderRadius: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, padding: '12px 16px', background: 'var(--color-surface-strong)', borderRadius: 8 }}>
             <Coins size={18} />
             <span>Saldo: <strong>{displayBalance} moedas disponíveis</strong></span>
           </div>

@@ -1,7 +1,7 @@
-import type { FastifyInstance } from 'fastify';
+﻿import type { FastifyInstance } from 'fastify';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
-import { createPartnerCompanyService, type CreatePartnerCompanyInput, type UpdatePartnerCompanyInput } from '../application/partner-company-service.js';
+import { createPartnerCompanyService, type CreatePartnerCompanyInput, type RegisterPartnerCompanyInput, type UpdatePartnerCompanyInput } from '../application/partner-company-service.js';
 import { toPartnerCompanyListResponse, toPartnerCompanyResponse } from '../responder/partner-company-responder.js';
 
 const partnerCompanyResponseSchema = {
@@ -13,6 +13,7 @@ const partnerCompanyResponseSchema = {
     email: { type: 'string', format: 'email' },
     cnpj: { type: 'string' },
     address: { type: 'string' },
+    status: { type: 'string', enum: ['pending', 'approved'] },
     createdAt: { type: 'string', format: 'date-time' },
     updatedAt: { type: 'string', format: 'date-time' }
   }
@@ -51,9 +52,45 @@ const paginatedPartnerSchema = {
 } as const;
 
 export async function partnerCompanyRoutes(app: FastifyInstance) {
-  const service = createPartnerCompanyService(app);
+  const service = createPartnerCompanyService(app.prisma);
 
-  app.get<{ Querystring: { page?: number; limit?: number } }>('/api/parceiros', {
+  // Public: partner self-registration (status = PENDING)
+  app.post<{ Body: RegisterPartnerCompanyInput }>('/api/parceiros/solicitar', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+    schema: {
+      tags: ['Parceiros'],
+      summary: 'Solicita cadastro como empresa parceira (aguarda aprovacao)',
+      body: partnerCompanyBodySchema,
+      response: { 201: partnerCompanyResponseSchema, 409: errorSchema }
+    }
+  }, async (request, reply) => {
+    try {
+      const partner = await service.register(request.body);
+      return reply.status(201).send(toPartnerCompanyResponse(partner));
+    } catch (error) {
+      return sendErrorResponse(reply, error, 'Empresa parceira ja cadastrada com email ou CNPJ informado');
+    }
+  });
+
+  // Admin: approve a pending partner and send approval email
+  app.post<{ Params: { id: string } }>('/api/parceiros/:id/aprovar', {
+    preHandler: [app.authenticate, requireRole('admin')],
+    schema: {
+      tags: ['Parceiros'],
+      summary: 'Aprova o cadastro de uma empresa parceira e envia email de confirmacao',
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
+      response: { 200: partnerCompanyResponseSchema, 404: errorSchema }
+    }
+  }, async (request, reply) => {
+    try {
+      const partner = await service.approve(request.params.id);
+      return toPartnerCompanyResponse(partner);
+    } catch (error) {
+      return sendErrorResponse(reply, error, 'Empresa parceira nao encontrada');
+    }
+  });
+
+  app.get<{ Querystring: { page?: number; limit?: number; status?: 'PENDING' | 'APPROVED' } }>('/api/parceiros', {
     preHandler: [app.authenticate, requireRole('admin')],
     schema: {
       tags: ['Parceiros'],
@@ -62,14 +99,15 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
         type: 'object',
         properties: {
           page: { type: 'integer', minimum: 1, default: 1 },
-          limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 }
+          limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 },
+          status: { type: 'string', enum: ['PENDING', 'APPROVED'] }
         }
       },
       response: { 200: paginatedPartnerSchema }
     }
   }, async (request) => {
-    const { page = 1, limit = 50 } = request.query;
-    const result = await service.list(page, limit);
+    const { page = 1, limit = 50, status } = request.query;
+    const result = await service.list(page, limit, status);
     return { ...result, data: toPartnerCompanyListResponse(result.data) };
   });
 
@@ -91,7 +129,7 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
     preHandler: [app.authenticate, requireRole('admin')],
     schema: {
       tags: ['Parceiros'],
-      summary: 'Cadastra uma empresa parceira',
+      summary: 'Cadastra uma empresa parceira (admin — aprovada automaticamente)',
       body: partnerCompanyBodySchema,
       response: { 201: partnerCompanyResponseSchema, 409: errorSchema }
     }
@@ -137,3 +175,4 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 }
+

@@ -1,7 +1,9 @@
-import type { FastifyInstance } from 'fastify';
+import type { PrismaClient } from '@prisma/client';
 import { EmailVO } from '../../../shared/domain/value-objects/email-vo.js';
 import { hashPassword } from '../../../shared/security/password-hasher.js';
 import { paginate, toPaginatedResult } from '../../../shared/pagination/pagination.js';
+import { sendPartnerApprovalEmail, sendPartnerRegistrationEmail } from '../../../shared/email/email-service.js';
+import { DomainErrors } from '../../../shared/errors/domain-errors.js';
 
 export type CreatePartnerCompanyInput = {
   corporateName: string;
@@ -14,24 +16,28 @@ export type CreatePartnerCompanyInput = {
 
 export type UpdatePartnerCompanyInput = Partial<CreatePartnerCompanyInput>;
 
-export function createPartnerCompanyService(app: FastifyInstance) {
+export type RegisterPartnerCompanyInput = CreatePartnerCompanyInput;
+
+export function createPartnerCompanyService(prisma: PrismaClient) {
   return {
-    async list(page = 1, limit = 50) {
+    async list(page = 1, limit = 50, status?: 'PENDING' | 'APPROVED') {
+      const where = status ? { status } : undefined;
       const p = paginate(page, limit);
       const [data, total] = await Promise.all([
-        app.prisma.partnerCompany.findMany({
+        prisma.partnerCompany.findMany({
+          where,
           include: { user: true },
           orderBy: { createdAt: 'desc' },
           skip: p.skip,
           take: p.take
         }),
-        app.prisma.partnerCompany.count()
+        prisma.partnerCompany.count({ where })
       ]);
       return toPaginatedResult(data, total, p.page, p.limit);
     },
 
     findById(id: string) {
-      return app.prisma.partnerCompany.findUnique({
+      return prisma.partnerCompany.findUnique({
         where: { id },
         include: { user: true }
       });
@@ -39,7 +45,7 @@ export function createPartnerCompanyService(app: FastifyInstance) {
 
     create(input: CreatePartnerCompanyInput) {
       EmailVO.create(input.email);
-      return app.prisma.$transaction(async (tx) => {
+      return prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
           data: {
             name: input.corporateName,
@@ -55,19 +61,67 @@ export function createPartnerCompanyService(app: FastifyInstance) {
             corporateName: input.corporateName,
             tradeName: input.tradeName,
             cnpj: input.cnpj,
-            address: input.address
+            address: input.address,
+            status: 'APPROVED'
           },
           include: { user: true }
         });
       });
     },
 
+    register(input: RegisterPartnerCompanyInput) {
+      EmailVO.create(input.email);
+      return prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            name: input.corporateName,
+            email: input.email,
+            passwordHash: hashPassword(input.password),
+            role: 'PARTNER'
+          }
+        });
+
+        return tx.partnerCompany.create({
+          data: {
+            userId: user.id,
+            corporateName: input.corporateName,
+            tradeName: input.tradeName,
+            cnpj: input.cnpj,
+            address: input.address,
+            status: 'PENDING'
+          },
+          include: { user: true }
+        });
+      }).then((partner) => {
+        void sendPartnerRegistrationEmail(partner.user.email, partner.corporateName);
+        return partner;
+      });
+    },
+
+    async approve(id: string) {
+      const partner = await prisma.partnerCompany.findUnique({
+        where: { id },
+        include: { user: true }
+      });
+      if (!partner) throw DomainErrors.partnerNotFound();
+
+      const updated = await prisma.partnerCompany.update({
+        where: { id },
+        data: { status: 'APPROVED' },
+        include: { user: true }
+      });
+
+      void sendPartnerApprovalEmail(partner.user.email, partner.corporateName);
+
+      return updated;
+    },
+
     async update(id: string, input: UpdatePartnerCompanyInput) {
       if (input.email) EmailVO.create(input.email);
-      const partnerCompany = await app.prisma.partnerCompany.findUnique({ where: { id }, include: { user: true } });
+      const partnerCompany = await prisma.partnerCompany.findUnique({ where: { id }, include: { user: true } });
       if (!partnerCompany) return null;
 
-      return app.prisma.$transaction(async (tx) => {
+      return prisma.$transaction(async (tx) => {
         if (input.email || input.password || input.corporateName) {
           await tx.user.update({
             where: { id: partnerCompany.userId },
@@ -93,9 +147,9 @@ export function createPartnerCompanyService(app: FastifyInstance) {
     },
 
     async delete(id: string) {
-      const partnerCompany = await app.prisma.partnerCompany.findUnique({ where: { id } });
+      const partnerCompany = await prisma.partnerCompany.findUnique({ where: { id } });
       if (!partnerCompany) return null;
-      await app.prisma.user.delete({ where: { id: partnerCompany.userId } });
+      await prisma.user.delete({ where: { id: partnerCompany.userId } });
       return partnerCompany;
     }
   };

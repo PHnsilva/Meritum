@@ -1,3 +1,5 @@
+export type ParceiroStatus = 'pending' | 'approved';
+
 export type Parceiro = {
   id: string;
   corporateName: string;
@@ -5,6 +7,7 @@ export type Parceiro = {
   email: string;
   cnpj: string;
   address: string;
+  status: ParceiroStatus;
   createdAt: string;
   updatedAt: string;
 };

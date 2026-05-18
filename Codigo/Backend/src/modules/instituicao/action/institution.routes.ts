@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+﻿import type { FastifyInstance } from 'fastify';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
 import { createInstitutionService, type CreateInstitutionInput, type UpdateInstitutionInput } from '../application/institution-service.js';
@@ -29,13 +29,13 @@ const updateInstitutionBodySchema = {
 const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
 export async function institutionRoutes(app: FastifyInstance) {
-  const institutionService = createInstitutionService(app);
+  const institutionService = createInstitutionService(app.prisma);
 
+  // Public — needed for student self-registration select
   app.get('/api/instituicoes', {
-    preHandler: [app.authenticate, requireRole('admin', 'professor', 'student', 'partner')],
     schema: {
       tags: ['Instituicoes'],
-      summary: 'Lista instituicoes de ensino (usada em selects)',
+      summary: 'Lista instituicoes de ensino (publica — usada em selects de cadastro)',
       response: { 200: { type: 'array', items: institutionResponseSchema } }
     }
   }, async () => {
@@ -110,3 +110,4 @@ export async function institutionRoutes(app: FastifyInstance) {
     }
   });
 }
+

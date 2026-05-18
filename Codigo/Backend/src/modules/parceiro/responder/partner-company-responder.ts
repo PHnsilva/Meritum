@@ -4,6 +4,7 @@ type PartnerCompanyWithUser = {
   tradeName: string | null;
   cnpj: string;
   address: string;
+  status: string;
   createdAt: Date;
   updatedAt: Date;
   user: { id: string; name: string; email: string; role: string };
@@ -17,6 +18,7 @@ export function toPartnerCompanyResponse(partnerCompany: PartnerCompanyWithUser)
     email: partnerCompany.user.email,
     cnpj: partnerCompany.cnpj,
     address: partnerCompany.address,
+    status: partnerCompany.status.toLowerCase() as 'pending' | 'approved',
     createdAt: partnerCompany.createdAt,
     updatedAt: partnerCompany.updatedAt
   };

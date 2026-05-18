@@ -81,6 +81,100 @@ function buildProfessorActivationHtml(name: string, tempPassword: string): strin
 </html>`;
 }
 
+function buildPartnerRegistrationHtml(name: string): string {
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><title>Meritum - Cadastro Recebido</title></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;padding:32px">
+    <h1 style="color:#2563eb;margin-top:0">Meritum</h1>
+    <h2 style="color:#1e293b">Solicitacao recebida!</h2>
+    <p>Ola, <strong>${name}</strong>!</p>
+    <p>Recebemos a solicitacao de cadastro da sua empresa como parceira no sistema Meritum.</p>
+    <p>Nossa equipe ira analisar e, apos a aprovacao, voce recebera um novo email confirmando o acesso.</p>
+    <p style="color:#64748b;font-size:14px">Caso nao tenha feito esta solicitacao, ignore este email.</p>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
+    <p style="color:#94a3b8;font-size:12px">Sistema de Moeda Estudantil - Meritum</p>
+  </div>
+</body>
+</html>`;
+}
+
+function buildPartnerApprovalHtml(name: string): string {
+  const frontendUrl = process.env['FRONTEND_URL'] ?? 'http://localhost:5173';
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><title>Meritum - Conta Aprovada</title></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;padding:32px">
+    <h1 style="color:#2563eb;margin-top:0">Meritum</h1>
+    <h2 style="color:#1e293b">Sua conta foi aprovada!</h2>
+    <p>Ola, <strong>${name}</strong>!</p>
+    <p>Sua solicitacao de cadastro como empresa parceira no sistema Meritum foi <strong>aprovada</strong>.</p>
+    <p>Voce ja pode acessar o sistema com o email e senha informados no cadastro.</p>
+    <div style="text-align:center;margin:32px 0">
+      <a href="${frontendUrl}/login" style="background:#2563eb;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">
+        Acessar o sistema
+      </a>
+    </div>
+    <p style="color:#64748b;font-size:14px">Se voce nao se cadastrou, ignore este email.</p>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
+    <p style="color:#94a3b8;font-size:12px">Sistema de Moeda Estudantil - Meritum</p>
+  </div>
+</body>
+</html>`;
+}
+
+function buildStudentCouponHtml(studentName: string, advantageTitle: string, partnerName: string, coinCost: number, code: string): string {
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><title>Meritum - Cupom de Resgate</title></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;padding:32px">
+    <h1 style="color:#2563eb;margin-top:0">Meritum</h1>
+    <h2 style="color:#1e293b">Seu cupom de resgate</h2>
+    <p>Ola, <strong>${studentName}</strong>!</p>
+    <p>Voce resgatou a vantagem <strong>${advantageTitle}</strong> oferecida por <strong>${partnerName}</strong> por <strong>${coinCost} moedas</strong>.</p>
+    <p>Apresente o codigo abaixo no estabelecimento para utilizar sua vantagem:</p>
+    <div style="background:#fefce8;border-left:4px solid #ca8a04;padding:20px;margin:24px 0;border-radius:4px;text-align:center">
+      <p style="margin:0 0 8px;font-size:0.85rem;color:#78350f">CODIGO DO CUPOM</p>
+      <p style="margin:0;font-size:2rem;font-weight:700;letter-spacing:0.25em;color:#92400e">${code}</p>
+    </div>
+    <p style="color:#64748b;font-size:14px">Guarde este email. O codigo e unico e sera verificado pelo parceiro no momento da troca.</p>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
+    <p style="color:#94a3b8;font-size:12px">Sistema de Moeda Estudantil - Meritum</p>
+  </div>
+</body>
+</html>`;
+}
+
+function buildPartnerRedemptionHtml(partnerName: string, studentName: string, advantageTitle: string, coinCost: number, code: string): string {
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><title>Meritum - Nova Troca</title></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;padding:32px">
+    <h1 style="color:#2563eb;margin-top:0">Meritum</h1>
+    <h2 style="color:#1e293b">Nova troca realizada</h2>
+    <p>Ola, <strong>${partnerName}</strong>!</p>
+    <p>O aluno <strong>${studentName}</strong> resgatou a vantagem <strong>${advantageTitle}</strong> por <strong>${coinCost} moedas</strong>.</p>
+    <p>Quando o aluno apresentar o cupom, verifique o codigo abaixo:</p>
+    <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:20px;margin:24px 0;border-radius:4px;text-align:center">
+      <p style="margin:0 0 8px;font-size:0.85rem;color:#15803d">CODIGO DO CUPOM A VERIFICAR</p>
+      <p style="margin:0;font-size:2rem;font-weight:700;letter-spacing:0.25em;color:#166534">${code}</p>
+    </div>
+    <p style="color:#64748b;font-size:14px">Confirme que o codigo apresentado pelo aluno corresponde ao codigo acima antes de realizar a troca.</p>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
+    <p style="color:#94a3b8;font-size:12px">Sistema de Moeda Estudantil - Meritum</p>
+  </div>
+</body>
+</html>`;
+}
+
 async function sendWithNodemailer(opts: {
   to: string;
   subject: string;
@@ -114,6 +208,30 @@ async function sendWithNodemailer(opts: {
   await transporter.sendMail({ from, to: opts.to, subject: opts.subject, html: opts.html });
 }
 
+export async function sendStudentCouponEmail(studentEmail: string, studentName: string, advantageTitle: string, partnerName: string, coinCost: number, code: string): Promise<void> {
+  try {
+    await sendWithNodemailer({
+      to: studentEmail,
+      subject: `Meritum: cupom de resgate — ${advantageTitle}`,
+      html: buildStudentCouponHtml(studentName, advantageTitle, partnerName, coinCost, code)
+    });
+  } catch (err) {
+    console.error('[email] Falha ao enviar cupom ao aluno:', err);
+  }
+}
+
+export async function sendPartnerRedemptionEmail(partnerEmail: string, partnerName: string, studentName: string, advantageTitle: string, coinCost: number, code: string): Promise<void> {
+  try {
+    await sendWithNodemailer({
+      to: partnerEmail,
+      subject: `Meritum: nova troca — ${advantageTitle}`,
+      html: buildPartnerRedemptionHtml(partnerName, studentName, advantageTitle, coinCost, code)
+    });
+  } catch (err) {
+    console.error('[email] Falha ao notificar parceiro da troca:', err);
+  }
+}
+
 export async function sendCoinReceivedEmail(params: SendCoinEmailParams): Promise<void> {
   try {
     await sendWithNodemailer({
@@ -135,6 +253,30 @@ export async function sendProfessorActivationEmail(professorEmail: string, profe
     });
   } catch (err) {
     console.error('[email] Falha ao enviar ativacao:', err);
+  }
+}
+
+export async function sendPartnerRegistrationEmail(partnerEmail: string, partnerName: string): Promise<void> {
+  try {
+    await sendWithNodemailer({
+      to: partnerEmail,
+      subject: 'Meritum: solicitacao de cadastro recebida',
+      html: buildPartnerRegistrationHtml(partnerName)
+    });
+  } catch (err) {
+    console.error('[email] Falha ao confirmar registro de parceiro:', err);
+  }
+}
+
+export async function sendPartnerApprovalEmail(partnerEmail: string, partnerName: string): Promise<void> {
+  try {
+    await sendWithNodemailer({
+      to: partnerEmail,
+      subject: 'Meritum: sua conta de empresa parceira foi aprovada',
+      html: buildPartnerApprovalHtml(partnerName)
+    });
+  } catch (err) {
+    console.error('[email] Falha ao notificar aprovacao de parceiro:', err);
   }
 }
 

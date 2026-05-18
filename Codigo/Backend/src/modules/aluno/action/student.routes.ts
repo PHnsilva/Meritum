@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+﻿import type { FastifyInstance } from 'fastify';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
 import { createStudentService, type CreateStudentInput, type UpdateStudentInput } from '../application/student-service.js';
@@ -62,7 +62,7 @@ const paginatedStudentSchema = {
 } as const;
 
 export async function studentRoutes(app: FastifyInstance) {
-  const studentService = createStudentService(app);
+  const studentService = createStudentService(app.prisma);
 
   app.get<{ Querystring: { institutionId?: string; page?: number; limit?: number } }>('/api/alunos', {
     preHandler: [app.authenticate, requireRole('admin', 'professor')],
@@ -149,3 +149,4 @@ export async function studentRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 }
+

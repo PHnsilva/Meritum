@@ -135,7 +135,6 @@ export function AlunoForm({ initialValue, submitLabel = 'Salvar aluno', requireP
           label: instituicao.name
         }))}
         disabled={loadingInstituicoes || instituicoes.length === 0}
-        hint={instituicoes.length === 0 && !loadingInstituicoes ? 'Cadastre instituicoes no backend antes de criar alunos' : undefined}
         required
       />
       <TextField
