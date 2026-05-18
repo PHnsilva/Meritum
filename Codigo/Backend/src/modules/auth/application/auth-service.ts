@@ -29,6 +29,10 @@ export function createAuthService(app: FastifyInstance) {
 
       if (!user || !verifyPassword(input.password, user.passwordHash)) return null;
 
+      if (user.role === 'PARTNER' && user.partnerCompany?.status === 'PENDING') {
+        throw DomainErrors.accountPending();
+      }
+
       const coinBalance = user.student?.coinBalance ?? user.professor?.coinBalance ?? null;
       const entityId = user.student?.id ?? user.professor?.id ?? user.partnerCompany?.id ?? user.id;
 

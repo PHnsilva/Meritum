@@ -12,6 +12,7 @@ import { professorRoutes } from './modules/professor/action/professor.routes.js'
 import { professorActivationRoutes } from './modules/professor/action/professor-activation.routes.js';
 import { authRoutes } from './modules/auth/action/auth.routes.js';
 import { coinRoutes } from './modules/moeda/action/coin.routes.js';
+import { advantageRoutes } from './modules/vantagem/action/advantage.routes.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -41,6 +42,7 @@ export async function buildApp() {
   await app.register(professorRoutes);
   await app.register(professorActivationRoutes);
   await app.register(coinRoutes);
+  await app.register(advantageRoutes);
 
   return app;
 }

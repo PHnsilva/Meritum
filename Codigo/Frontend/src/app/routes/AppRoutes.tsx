@@ -9,6 +9,7 @@ import { AlterarSenhaPage } from '../../modules/auth/pages/AlterarSenhaPage';
 import { DashboardPage } from '../../modules/dashboard/pages/DashboardPage';
 import { StudentDashboardPage } from '../../modules/dashboard/pages/StudentDashboardPage';
 import { ProfessorDashboardPage } from '../../modules/dashboard/pages/ProfessorDashboardPage';
+import { PartnerDashboardPage } from '../../modules/dashboard/pages/PartnerDashboardPage';
 import { AlunoListPage } from '../../modules/aluno/pages/AlunoListPage';
 import { AlunoCreatePage } from '../../modules/aluno/pages/AlunoCreatePage';
 import { AlunoEditPage } from '../../modules/aluno/pages/AlunoEditPage';
@@ -25,7 +26,11 @@ import { PerfilPage } from '../../modules/auth/pages/PerfilPage';
 import { EnviarMoedasPage } from '../../modules/moeda/pages/EnviarMoedasPage';
 import { ExtratoProfessorPage } from '../../modules/moeda/pages/ExtratoProfessorPage';
 import { ExtratoAlunoPage } from '../../modules/moeda/pages/ExtratoAlunoPage';
-import { PlaceholderPage } from '../../shared/components/PlaceholderPage';
+import { CadastroParceiroPage } from '../../modules/parceiro/pages/CadastroParceiroPage';
+import { VantagemCatalogPage } from '../../modules/vantagem/pages/VantagemCatalogPage';
+import { VantagemManagePage } from '../../modules/vantagem/pages/VantagemManagePage';
+import { VantagemCreatePage } from '../../modules/vantagem/pages/VantagemCreatePage';
+import { VantagemEditPage } from '../../modules/vantagem/pages/VantagemEditPage';
 import type { UserRole } from '../../shared/types/api';
 
 function ProtectedRoute() {
@@ -46,6 +51,7 @@ function HomeDashboard() {
   const user = getStoredUser();
   if (user?.role === 'student') return <StudentDashboardPage />;
   if (user?.role === 'professor') return <ProfessorDashboardPage />;
+  if (user?.role === 'partner') return <PartnerDashboardPage />;
   return <DashboardPage />;
 }
 
@@ -57,6 +63,7 @@ export function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/cadastro" element={<RegisterPage />} />
       <Route path="/ativar-conta" element={<ActivarContaPage />} />
+      <Route path="/cadastro-parceiro" element={<CadastroParceiroPage />} />
       <Route path="/alterar-senha" element={<AlterarSenhaPage />} />
       <Route element={<ProtectedRoute />}>
         <Route index element={<HomeDashboard />} />
@@ -84,7 +91,16 @@ export function AppRoutes() {
 
         {/* Shared */}
         <Route path="/perfil" element={<PerfilPage />} />
-        <Route path="/vantagens" element={<PlaceholderPage title="Vantagens" />} />
+
+        {/* Vantagens — catalog visible to all; manage/create/edit partner only */}
+        <Route path="/vantagens" element={
+          getStoredUser()?.role === 'partner'
+            ? <VantagemManagePage />
+            : <VantagemCatalogPage />
+        } />
+        <Route path="/vantagens/nova" element={<RoleGuard blocked={['student', 'professor', 'admin']}><VantagemCreatePage /></RoleGuard>} />
+        <Route path="/vantagens/:id/editar" element={<RoleGuard blocked={['student', 'professor', 'admin']}><VantagemEditPage /></RoleGuard>} />
+        <Route path="/catalogo" element={<VantagemCatalogPage />} />
       </Route>
     </Routes>
   );

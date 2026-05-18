@@ -12,4 +12,8 @@ export const DomainErrors = {
   differentInstitution: () => createError('Professor e aluno nao pertencem a mesma instituicao', 'DifferentInstitutionError'),
   userNotFound: () => createError('Usuario nao encontrado', 'UserNotFoundError'),
   partnerNotFound: () => createError('Empresa parceira nao encontrada', 'PartnerNotFoundError'),
+  accountPending: () => createError('Conta aguardando aprovacao da administracao', 'AccountPendingError'),
+  advantageNotFound: () => createError('Vantagem nao encontrada', 'AdventageNotFoundError'),
+  advantageInactive: () => createError('Vantagem nao esta disponivel para resgate', 'AdventageInactiveError'),
+  advantageOwnership: () => createError('Voce nao tem permissao para modificar esta vantagem', 'AdventageOwnershipError'),
 };

@@ -48,10 +48,17 @@ export async function authRoutes(app: FastifyInstance) {
       response: { 200: authUserSchema, 401: messageSchema }
     }
   }, async (request, reply) => {
-    const result = await authService.login(request.body);
-    if (!result) return reply.status(401).send({ message: 'Email ou senha invalidos' });
-    const token = app.jwt.sign({ sub: result.id, role: result.role });
-    return toAuthUserResponse(result, token);
+    try {
+      const result = await authService.login(request.body);
+      if (!result) return reply.status(401).send({ message: 'Email ou senha invalidos' });
+      const token = app.jwt.sign({ sub: result.id, role: result.role });
+      return toAuthUserResponse(result, token);
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AccountPendingError') {
+        return reply.status(403).send({ message: error.message });
+      }
+      throw error;
+    }
   });
 
   app.post('/api/auth/refresh', {
