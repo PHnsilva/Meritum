@@ -2,6 +2,8 @@ import { Coins, Gift, ShoppingBag } from 'lucide-react';
 import { useState } from 'react';
 import { Alert } from '../../../shared/components/Alert';
 import { Button } from '../../../shared/components/Button';
+import { ConfirmModal } from '../../../shared/components/ConfirmModal';
+import { updateStoredCoinBalance } from '../../auth/services/authService';
 import { resgatarVantagem } from '../services/vantagemService';
 import type { Resgate, Vantagem } from '../types/vantagem';
 
@@ -16,14 +18,20 @@ export function VantagemCard({ vantagem, canRedeem = false, onRedeemed, onClick 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [redeemed, setRedeemed] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  async function handleRedeem(e: React.MouseEvent) {
+  function handleRedeem(e: React.MouseEvent) {
     e.stopPropagation();
-    if (!window.confirm(`Deseja resgatar "${vantagem.title}" por ${vantagem.costInCoins} moedas?`)) return;
+    setShowConfirm(true);
+  }
+
+  async function handleRedeemConfirmed() {
+    setShowConfirm(false);
     setError('');
     setLoading(true);
     try {
       const resgate = await resgatarVantagem(vantagem.id);
+      updateStoredCoinBalance(-vantagem.costInCoins);
       setRedeemed(true);
       onRedeemed?.(resgate);
     } catch (err) {
@@ -79,6 +87,16 @@ export function VantagemCard({ vantagem, canRedeem = false, onRedeemed, onClick 
           {vantagem.partner.name}
         </p>
 
+        {showConfirm && (
+          <ConfirmModal
+            title="Resgatar vantagem"
+            message={`Deseja resgatar "${vantagem.title}" por ${vantagem.costInCoins} moedas?`}
+            confirmLabel="Resgatar"
+            onConfirm={() => void handleRedeemConfirmed()}
+            onCancel={() => setShowConfirm(false)}
+          />
+        )}
+
         {error ? <Alert tone="error">{error}</Alert> : null}
 
         {redeemed ? (
@@ -90,7 +108,7 @@ export function VantagemCard({ vantagem, canRedeem = false, onRedeemed, onClick 
             <Button
               icon={<ShoppingBag size={14} />}
               disabled={loading}
-              onClick={(e) => void handleRedeem(e)}
+              onClick={handleRedeem}
               style={{ width: '100%' }}
             >
               {loading ? 'Resgatando...' : 'Resgatar'}

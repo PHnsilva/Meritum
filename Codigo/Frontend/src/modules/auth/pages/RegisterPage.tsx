@@ -2,14 +2,14 @@ import { ArrowLeft, School, UserPlus } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ThemeToggle } from '../../../shared/components/ThemeToggle';
 import { AlunoForm } from '../../aluno/components/AlunoForm';
-import { createAluno } from '../../aluno/services/alunoService';
+import { apiClient } from '../../../shared/http/apiClient';
 import type { CreateAlunoInput, UpdateAlunoInput } from '../../aluno/types/aluno';
 
 export function RegisterPage() {
   const navigate = useNavigate();
 
   async function handleSubmit(input: CreateAlunoInput | UpdateAlunoInput) {
-    await createAluno(input as CreateAlunoInput);
+    await apiClient('/api/auth/register', { method: 'POST', body: input });
     navigate('/login', { state: { registered: true } });
   }
 

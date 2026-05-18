@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert } from '../../../shared/components/Alert';
 import { Button } from '../../../shared/components/Button';
+import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { PageHeader } from '../../../shared/components/PageHeader';
 import { SearchInput } from '../../../shared/components/SearchInput';
 import { deleteInstituicao, listInstituicoes } from '../services/instituicaoService';
@@ -13,6 +14,7 @@ export function InstituicaoListPage() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   async function loadInstituicoes() {
     setLoading(true);
@@ -27,11 +29,10 @@ export function InstituicaoListPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!window.confirm('Deseja remover esta instituicao?')) {
-      return;
-    }
-
+  async function handleDeleteConfirmed() {
+    if (!confirmDeleteId) return;
+    const id = confirmDeleteId;
+    setConfirmDeleteId(null);
     try {
       await deleteInstituicao(id);
       await loadInstituicoes();
@@ -47,6 +48,17 @@ export function InstituicaoListPage() {
   const filtered = instituicoes.filter((i) => i.name.toLowerCase().includes(query.toLowerCase()));
 
   return (
+    <>
+      {confirmDeleteId && (
+        <ConfirmModal
+          title="Remover instituicao"
+          message="Deseja remover esta instituicao? A acao nao pode ser desfeita."
+          confirmLabel="Remover"
+          danger
+          onConfirm={() => void handleDeleteConfirmed()}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
     <section className="stack">
       <PageHeader
         title="Instituicoes"
@@ -101,7 +113,7 @@ export function InstituicaoListPage() {
                         <Link className="icon-button" to={`/instituicoes/${instituicao.id}/editar`} aria-label="Editar instituicao">
                           <Edit3 size={16} />
                         </Link>
-                        <button className="icon-button icon-button--danger" type="button" onClick={() => void handleDelete(instituicao.id)} aria-label="Remover instituicao">
+                        <button className="icon-button icon-button--danger" type="button" onClick={() => setConfirmDeleteId(instituicao.id)} aria-label="Remover instituicao">
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -114,5 +126,6 @@ export function InstituicaoListPage() {
         )}
       </div>
     </section>
+    </>
   );
 }

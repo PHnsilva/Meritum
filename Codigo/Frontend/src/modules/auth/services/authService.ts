@@ -21,6 +21,11 @@ export function clearStoredUser() {
   localStorage.removeItem(STORAGE_KEY);
 }
 
+export function updateStoredCoinBalance(delta: number) {
+  const user = getStoredUser();
+  if (user && user.coinBalance != null) storeUser({ ...user, coinBalance: user.coinBalance + delta });
+}
+
 export async function login(input: LoginInput) {
   const response = await apiClient<{ token: string; user: Omit<AuthUser, 'token'> }>('/api/auth/login', {
     method: 'POST',

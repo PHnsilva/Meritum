@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert } from '../../../shared/components/Alert';
 import { Button } from '../../../shared/components/Button';
+import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { PageHeader } from '../../../shared/components/PageHeader';
 import { SearchInput } from '../../../shared/components/SearchInput';
 import { formatCpf } from '../../../shared/utils/formatters';
@@ -14,6 +15,7 @@ export function AlunoListPage() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   async function loadAlunos() {
     setLoading(true);
@@ -28,11 +30,10 @@ export function AlunoListPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!window.confirm('Deseja remover este aluno?')) {
-      return;
-    }
-
+  async function handleDeleteConfirmed() {
+    if (!confirmDeleteId) return;
+    const id = confirmDeleteId;
+    setConfirmDeleteId(null);
     try {
       await deleteAluno(id);
       await loadAlunos();
@@ -55,6 +56,17 @@ export function AlunoListPage() {
   );
 
   return (
+    <>
+      {confirmDeleteId && (
+        <ConfirmModal
+          title="Remover aluno"
+          message="Deseja remover este aluno? A acao nao pode ser desfeita."
+          confirmLabel="Remover"
+          danger
+          onConfirm={() => void handleDeleteConfirmed()}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
     <section className="stack">
       <PageHeader
         title="Alunos"
@@ -115,7 +127,7 @@ export function AlunoListPage() {
                         <Link className="icon-button" to={`/alunos/${aluno.id}/editar`} aria-label="Editar aluno">
                           <Edit3 size={16} />
                         </Link>
-                        <button className="icon-button icon-button--danger" type="button" onClick={() => void handleDelete(aluno.id)} aria-label="Remover aluno">
+                        <button className="icon-button icon-button--danger" type="button" onClick={() => setConfirmDeleteId(aluno.id)} aria-label="Remover aluno">
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -128,5 +140,6 @@ export function AlunoListPage() {
         )}
       </div>
     </section>
+    </>
   );
 }

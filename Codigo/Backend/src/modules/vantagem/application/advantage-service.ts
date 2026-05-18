@@ -49,10 +49,19 @@ export function createAdvantageService(prisma: PrismaClient) {
       });
     },
 
-    async update(id: string, partnerId: string, input: UpdateAdvantageInput) {
+    async listAll() {
+      return prisma.advantage.findMany({
+        include: { partner: { include: { user: true } } },
+        orderBy: { createdAt: 'desc' }
+      });
+    },
+
+    async update(id: string, requesterId: string, requesterRole: string, input: UpdateAdvantageInput) {
       const advantage = await prisma.advantage.findUnique({ where: { id } });
       if (!advantage) throw DomainErrors.advantageNotFound();
-      if (advantage.partnerId !== partnerId) throw DomainErrors.advantageOwnership();
+      if (requesterRole !== 'admin' && advantage.partnerId !== requesterId) {
+        throw DomainErrors.advantageOwnership();
+      }
 
       return prisma.advantage.update({
         where: { id },

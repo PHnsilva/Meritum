@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert } from '../../../shared/components/Alert';
 import { Button } from '../../../shared/components/Button';
+import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { PageHeader } from '../../../shared/components/PageHeader';
 import { SearchInput } from '../../../shared/components/SearchInput';
 import { formatCpf } from '../../../shared/utils/formatters';
@@ -14,6 +15,7 @@ export function ProfessorListPage() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -27,8 +29,10 @@ export function ProfessorListPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!window.confirm('Deseja remover este professor?')) return;
+  async function handleDeleteConfirmed() {
+    if (!confirmDeleteId) return;
+    const id = confirmDeleteId;
+    setConfirmDeleteId(null);
     try {
       await deleteProfessor(id);
       await load();
@@ -49,6 +53,17 @@ export function ProfessorListPage() {
   );
 
   return (
+    <>
+      {confirmDeleteId && (
+        <ConfirmModal
+          title="Remover professor"
+          message="Deseja remover este professor? A acao nao pode ser desfeita."
+          confirmLabel="Remover"
+          danger
+          onConfirm={() => void handleDeleteConfirmed()}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
     <section className="stack">
       <PageHeader
         title="Professores"
@@ -117,7 +132,7 @@ export function ProfessorListPage() {
                         <button
                           className="icon-button icon-button--danger"
                           type="button"
-                          onClick={() => void handleDelete(professor.id)}
+                          onClick={() => setConfirmDeleteId(professor.id)}
                           aria-label="Remover professor"
                         >
                           <Trash2 size={16} />
@@ -132,5 +147,6 @@ export function ProfessorListPage() {
         )}
       </div>
     </section>
+    </>
   );
 }

@@ -9,7 +9,7 @@ import { SelectField } from '../../../shared/components/SelectField';
 import { getStoredUser } from '../../auth/services/authService';
 import { listAlunos } from '../../aluno/services/alunoService';
 import type { Aluno } from '../../aluno/types/aluno';
-import { listMeusResgates } from '../../vantagem/services/vantagemService';
+import { listMeusResgates, listResgatesByAluno } from '../../vantagem/services/vantagemService';
 import type { Resgate } from '../../vantagem/types/vantagem';
 import { getExtratoAluno } from '../services/moedaService';
 import type { ExtratoResponse } from '../types/moeda';
@@ -40,7 +40,7 @@ function buildEntries(extrato: ExtratoResponse, resgates: Resgate[]): Entry[] {
     date: r.createdAt,
     amount: r.coinCost,
     label: r.advantage.title,
-    detail: `${r.advantage.partner} · ${r.code}`
+    detail: r.advantage.partner
   }));
 
   return [...received, ...redeemed].sort(
@@ -70,16 +70,13 @@ export function ExtratoAlunoPage() {
     setCoinBalance(null);
     try {
       if (isStudent) {
-        const [extrato, resgates] = await Promise.all([
-          getExtratoAluno(id),
-          listMeusResgates()
-        ]);
+        const [extrato, resgates] = await Promise.all([getExtratoAluno(id), listMeusResgates()]);
         setCoinBalance(extrato.coinBalance);
         setEntries(buildEntries(extrato, resgates));
       } else {
-        const extrato = await getExtratoAluno(id);
+        const [extrato, resgates] = await Promise.all([getExtratoAluno(id), listResgatesByAluno(id)]);
         setCoinBalance(extrato.coinBalance);
-        setEntries(buildEntries(extrato, []));
+        setEntries(buildEntries(extrato, resgates));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nao foi possivel carregar o extrato');

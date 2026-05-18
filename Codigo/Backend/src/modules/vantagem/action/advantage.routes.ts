@@ -60,6 +60,18 @@ export async function advantageRoutes(app: FastifyInstance) {
     return toAdvantageListResponse(list);
   });
 
+  // Admin — all advantages (all statuses, all partners)
+  app.get('/api/vantagens/admin', {
+    preHandler: [app.authenticate, requireRole('admin')],
+    schema: {
+      tags: ['Vantagens'],
+      summary: 'Lista todas as vantagens (admin)',
+      response: { 200: { type: 'array', items: advantageSchema } }
+    }
+  }, async () => {
+    return toAdvantageListResponse(await service.listAll());
+  });
+
   // Partner — own advantages (all statuses)
   app.get('/api/vantagens/minhas', {
     preHandler: [app.authenticate, requireRole('partner')],
@@ -136,10 +148,10 @@ export async function advantageRoutes(app: FastifyInstance) {
   });
 
   app.put<{ Params: { id: string }; Body: UpdateAdvantageInput }>('/api/vantagens/:id', {
-    preHandler: [app.authenticate, requireRole('partner')],
+    preHandler: [app.authenticate, requireRole('partner', 'admin')],
     schema: {
       tags: ['Vantagens'],
-      summary: 'Atualiza uma vantagem (parceiro proprietario)',
+      summary: 'Atualiza uma vantagem (parceiro proprietario ou admin)',
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       body: {
         type: 'object',
@@ -156,8 +168,8 @@ export async function advantageRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const { sub } = request.user as { sub: string };
-      const advantage = await service.update(request.params.id, sub, request.body);
+      const { sub, role } = request.user as { sub: string; role: string };
+      const advantage = await service.update(request.params.id, sub, role, request.body);
       return toAdvantageResponse(advantage);
     } catch (error) {
       return sendErrorResponse(reply, error);
@@ -201,16 +213,26 @@ export async function advantageRoutes(app: FastifyInstance) {
     }
   });
 
-  // Student — own redemption history
-  app.get('/api/resgates', {
-    preHandler: [app.authenticate, requireRole('student')],
+  // Student — own redemption history; admin — any student by ?studentId
+  app.get<{ Querystring: { studentId?: string } }>('/api/resgates', {
+    preHandler: [app.authenticate, requireRole('student', 'admin')],
     schema: {
       tags: ['Vantagens'],
-      summary: 'Historico de resgates do aluno autenticado',
-      response: { 200: { type: 'array', items: redemptionSchema } }
+      summary: 'Historico de resgates (aluno: proprios; admin: studentId obrigatorio)',
+      querystring: {
+        type: 'object',
+        properties: { studentId: { type: 'string', format: 'uuid' } }
+      },
+      response: { 200: { type: 'array', items: redemptionSchema }, 400: errorSchema }
     }
-  }, async (request) => {
-    const { sub } = request.user as { sub: string };
+  }, async (request, reply) => {
+    const { sub, role } = request.user as { sub: string; role: string };
+    if (role === 'admin') {
+      const { studentId } = request.query;
+      if (!studentId) return reply.status(400).send({ message: 'studentId e obrigatorio para admin' });
+      const list = await service.listRedemptionsByStudent(studentId);
+      return list.map(toRedemptionResponse);
+    }
     const list = await service.listRedemptionsByStudent(sub);
     return list.map(toRedemptionResponse);
   });

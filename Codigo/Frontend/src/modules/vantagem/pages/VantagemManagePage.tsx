@@ -3,16 +3,20 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert } from '../../../shared/components/Alert';
 import { Button } from '../../../shared/components/Button';
+import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { Modal } from '../../../shared/components/Modal';
 import { PageHeader } from '../../../shared/components/PageHeader';
 import { SearchInput } from '../../../shared/components/SearchInput';
-import { deleteVantagem, listMinhasVantagens, listPartnerResgates, listResgatesByVantagem, updateVantagem } from '../services/vantagemService';
+import { getStoredUser } from '../../auth/services/authService';
+import { deleteVantagem, listMinhasVantagens, listPartnerResgates, listResgatesByVantagem, listTodasVantagens, updateVantagem } from '../services/vantagemService';
 import type { Resgate, Vantagem } from '../types/vantagem';
 
 type Tab = 'vantagens' | 'resgates';
 type StatusFilter = 'all' | 'active' | 'inactive';
 
 export function VantagemManagePage() {
+  const user = getStoredUser();
+  const isAdmin = user?.role === 'admin';
   const [tab, setTab] = useState<Tab>('vantagens');
   const [vantagens, setVantagens] = useState<Vantagem[]>([]);
   const [resgates, setResgates] = useState<Resgate[]>([]);
@@ -23,6 +27,7 @@ export function VantagemManagePage() {
   const [error, setError] = useState('');
   const [toggling, setToggling] = useState<string | null>(null);
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [modal, setModal] = useState<{ vantagem: Vantagem; resgates: Resgate[] } | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [modalError, setModalError] = useState('');
@@ -31,7 +36,7 @@ export function VantagemManagePage() {
     setLoading(true);
     setError('');
     try {
-      setVantagens(await listMinhasVantagens());
+      setVantagens(isAdmin ? await listTodasVantagens() : await listMinhasVantagens());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nao foi possivel carregar as vantagens');
     } finally {
@@ -70,8 +75,10 @@ export function VantagemManagePage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!window.confirm('Deseja remover esta vantagem?')) return;
+  async function handleDeleteConfirmed() {
+    if (!confirmDeleteId) return;
+    const id = confirmDeleteId;
+    setConfirmDeleteId(null);
     setError('');
     try {
       await deleteVantagem(id);
@@ -121,16 +128,27 @@ export function VantagemManagePage() {
   });
 
   return (
+    <>
+      {confirmDeleteId && (
+        <ConfirmModal
+          title="Remover vantagem"
+          message="Deseja remover esta vantagem? A acao nao pode ser desfeita."
+          confirmLabel="Remover"
+          danger
+          onConfirm={() => void handleDeleteConfirmed()}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
     <section className="stack">
       <PageHeader
-        title="Minhas vantagens"
-        description="Gerencie as vantagens que voce oferece e acompanhe os resgates."
+        title={isAdmin ? 'Gerenciar vantagens' : 'Minhas vantagens'}
+        description={isAdmin ? 'Visualize, edite e exclua vantagens de todos os parceiros.' : 'Gerencie as vantagens que voce oferece e acompanhe os resgates.'}
         actions={
           <>
             <Button variant="secondary" icon={<RefreshCw size={16} />} onClick={() => void (tab === 'vantagens' ? loadVantagens() : loadResgates())}>
               Atualizar
             </Button>
-            {tab === 'vantagens' && (
+            {!isAdmin && tab === 'vantagens' && (
               <Link className="button button--primary" to="/vantagens/nova">
                 <Plus size={16} />
                 <span>Nova vantagem</span>
@@ -140,15 +158,17 @@ export function VantagemManagePage() {
         }
       />
 
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--color-line)' }}>
-        <button type="button" style={tabStyle(tab === 'vantagens')} onClick={() => changeTab('vantagens')}>Vantagens</button>
-        <button type="button" style={tabStyle(tab === 'resgates')} onClick={() => changeTab('resgates')}>
-          Resgates
-          {resgates.length > 0 && tab !== 'resgates' && (
-            <span style={{ marginLeft: '0.375rem', background: 'var(--color-puc-blue)', color: 'var(--color-on-primary)', borderRadius: '9999px', fontSize: '0.7rem', padding: '0 0.375rem', lineHeight: '1.5' }}>{resgates.length}</span>
-          )}
-        </button>
-      </div>
+      {!isAdmin && (
+        <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--color-line)' }}>
+          <button type="button" style={tabStyle(tab === 'vantagens')} onClick={() => changeTab('vantagens')}>Vantagens</button>
+          <button type="button" style={tabStyle(tab === 'resgates')} onClick={() => changeTab('resgates')}>
+            Resgates
+            {resgates.length > 0 && tab !== 'resgates' && (
+              <span style={{ marginLeft: '0.375rem', background: 'var(--color-puc-blue)', color: 'var(--color-on-primary)', borderRadius: '9999px', fontSize: '0.7rem', padding: '0 0.375rem', lineHeight: '1.5' }}>{resgates.length}</span>
+            )}
+          </button>
+        </div>
+      )}
 
       {error ? <Alert tone="error">{error}</Alert> : null}
 
@@ -180,6 +200,7 @@ export function VantagemManagePage() {
                 <thead>
                   <tr>
                     <th>Titulo</th>
+                    {isAdmin && <th>Parceiro</th>}
                     <th>Custo</th>
                     <th>Status</th>
                     <th>Acoes</th>
@@ -187,13 +208,14 @@ export function VantagemManagePage() {
                 </thead>
                 <tbody>
                   {filteredV.map((v) => (
-                    <tr key={v.id} style={{ cursor: 'pointer' }} onClick={() => void handleRowClick(v)}>
+                    <tr key={v.id} style={{ cursor: isAdmin ? 'default' : 'pointer' }} onClick={isAdmin ? undefined : () => void handleRowClick(v)}>
                       <td>
                         <strong>{v.title}</strong>
                         <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-muted)', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {v.description}
                         </span>
                       </td>
+                      {isAdmin && <td style={{ fontSize: '0.875rem' }}>{v.partner.name}</td>}
                       <td>{v.costInCoins} moedas</td>
                       <td>
                         {v.isActive ? (
@@ -210,7 +232,7 @@ export function VantagemManagePage() {
                           <Link className="icon-button" to={`/vantagens/${v.id}/editar`} aria-label="Editar vantagem">
                             <Edit3 size={16} />
                           </Link>
-                          <button className="icon-button icon-button--danger" type="button" onClick={() => void handleDelete(v.id)} aria-label="Remover vantagem">
+                          <button className="icon-button icon-button--danger" type="button" onClick={() => setConfirmDeleteId(v.id)} aria-label="Remover vantagem">
                             <Trash2 size={16} />
                           </button>
                         </div>
@@ -292,5 +314,6 @@ export function VantagemManagePage() {
         </Modal>
       ) : null}
     </section>
+    </>
   );
 }

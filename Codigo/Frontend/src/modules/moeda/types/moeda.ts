@@ -13,7 +13,6 @@ export type ExtratoResponse = {
 };
 
 export type EnviarMoedasInput = {
-  professorId: string;
   studentId: string;
   amount: number;
   motive: string;

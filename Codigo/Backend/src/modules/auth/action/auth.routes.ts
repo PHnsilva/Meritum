@@ -3,6 +3,7 @@ import { createAuthService, type LoginInput, type UpdatePerfilInput } from '../a
 import { toAuthUserResponse } from '../responder/auth-responder.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
+import { createStudentService, type CreateStudentInput } from '../../aluno/application/student-service.js';
 
 const authUserSchema = {
   type: 'object',
@@ -31,6 +32,38 @@ type PerfilBody = { entityId: string } & UpdatePerfilInput;
 
 export async function authRoutes(app: FastifyInstance) {
   const authService = createAuthService(app.prisma);
+  const studentService = createStudentService(app.prisma);
+
+  // Public — student self-registration
+  app.post<{ Body: CreateStudentInput }>('/api/auth/register', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+    schema: {
+      tags: ['Auth'],
+      summary: 'Cadastro publico de aluno (auto-registro)',
+      body: {
+        type: 'object',
+        required: ['name', 'email', 'cpf', 'rg', 'address', 'institutionId', 'course', 'password'],
+        properties: {
+          name: { type: 'string', minLength: 2 },
+          email: { type: 'string', format: 'email' },
+          cpf: { type: 'string', minLength: 11 },
+          rg: { type: 'string', minLength: 3 },
+          address: { type: 'string', minLength: 3 },
+          institutionId: { type: 'string', format: 'uuid' },
+          course: { type: 'string', minLength: 2 },
+          password: { type: 'string', minLength: 6 }
+        }
+      },
+      response: { 201: { type: 'object', properties: { message: { type: 'string' } } }, 409: messageSchema }
+    }
+  }, async (request, reply) => {
+    try {
+      await studentService.create(request.body);
+      return reply.status(201).send({ message: 'Conta criada com sucesso. Faca login para continuar.' });
+    } catch (error) {
+      return sendErrorResponse(reply, error, 'Email, CPF ou RG ja cadastrado');
+    }
+  });
 
   app.post<{ Body: LoginInput }>('/api/auth/login', {
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },

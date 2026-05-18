@@ -144,7 +144,7 @@ export function PerfilPage() {
 
             {user.role === 'student' && (
               <>
-                <TextField label="CPF" value={cpf} onChange={(e) => setCpf(e.target.value)} />
+                <TextField label="CPF" value={cpf} onChange={() => {}} readOnly hint="CPF nao pode ser alterado" />
                 <TextField label="RG" value={rg} onChange={(e) => setRg(e.target.value)} />
                 <TextField label="Curso" value={course} onChange={(e) => setCourse(e.target.value)} />
                 <TextField label="Endereco" value={address} onChange={(e) => setAddress(e.target.value)} />
@@ -153,7 +153,7 @@ export function PerfilPage() {
 
             {user.role === 'professor' && (
               <>
-                <TextField label="CPF" value={cpf} onChange={(e) => setCpf(e.target.value)} />
+                <TextField label="CPF" value={cpf} onChange={() => {}} readOnly hint="CPF nao pode ser alterado" />
                 <TextField label="Departamento" value={department} onChange={(e) => setDepartment(e.target.value)} />
               </>
             )}

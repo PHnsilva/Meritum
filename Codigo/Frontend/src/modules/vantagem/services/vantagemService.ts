@@ -9,6 +9,10 @@ export function listMinhasVantagens(): Promise<Vantagem[]> {
   return apiClient<Vantagem[]>('/api/vantagens/minhas');
 }
 
+export function listTodasVantagens(): Promise<Vantagem[]> {
+  return apiClient<Vantagem[]>('/api/vantagens/admin');
+}
+
 export function getVantagem(id: string): Promise<Vantagem> {
   return apiClient<Vantagem>(`/api/vantagens/${id}`);
 }
@@ -31,6 +35,10 @@ export function resgatarVantagem(id: string): Promise<Resgate> {
 
 export function listMeusResgates(): Promise<Resgate[]> {
   return apiClient<Resgate[]>('/api/resgates');
+}
+
+export function listResgatesByAluno(studentId: string): Promise<Resgate[]> {
+  return apiClient<Resgate[]>(`/api/resgates?studentId=${studentId}`);
 }
 
 export function listResgatesByVantagem(id: string): Promise<Resgate[]> {

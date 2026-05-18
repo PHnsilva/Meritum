@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert } from '../../../shared/components/Alert';
 import { Button } from '../../../shared/components/Button';
+import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { PageHeader } from '../../../shared/components/PageHeader';
 import { SearchInput } from '../../../shared/components/SearchInput';
 import { formatCnpj } from '../../../shared/utils/formatters';
@@ -18,6 +19,7 @@ export function ParceiroListPage() {
   const [error, setError] = useState('');
   const [tab, setTab] = useState<Tab>('all');
   const [approving, setApproving] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   async function loadParceiros(currentTab: Tab = tab) {
     setLoading(true);
@@ -45,8 +47,10 @@ export function ParceiroListPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!window.confirm('Deseja remover esta empresa parceira?')) return;
+  async function handleDeleteConfirmed() {
+    if (!confirmDeleteId) return;
+    const id = confirmDeleteId;
+    setConfirmDeleteId(null);
     try {
       await deleteParceiro(id);
       await loadParceiros();
@@ -76,6 +80,17 @@ export function ParceiroListPage() {
   );
 
   return (
+    <>
+      {confirmDeleteId && (
+        <ConfirmModal
+          title="Remover empresa parceira"
+          message="Deseja remover esta empresa parceira? A acao nao pode ser desfeita."
+          confirmLabel="Remover"
+          danger
+          onConfirm={() => void handleDeleteConfirmed()}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
     <section className="stack">
       <PageHeader
         title="Empresas parceiras"
@@ -211,7 +226,7 @@ export function ParceiroListPage() {
                         <Link className="icon-button" to={`/parceiros/${parceiro.id}/editar`} aria-label="Editar parceiro">
                           <Edit3 size={16} />
                         </Link>
-                        <button className="icon-button icon-button--danger" type="button" onClick={() => void handleDelete(parceiro.id)} aria-label="Remover parceiro">
+                        <button className="icon-button icon-button--danger" type="button" onClick={() => setConfirmDeleteId(parceiro.id)} aria-label="Remover parceiro">
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -224,5 +239,6 @@ export function ParceiroListPage() {
         )}
       </div>
     </section>
+    </>
   );
 }
