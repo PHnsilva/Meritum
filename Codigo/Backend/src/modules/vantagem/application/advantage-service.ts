@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
-import type { FastifyInstance } from 'fastify';
+import type { PrismaClient } from '@prisma/client';
 import { DomainErrors } from '../../../shared/errors/domain-errors.js';
+import { CoinBalance } from '../../../shared/domain/value-objects/coin-balance.js';
 import { sendStudentCouponEmail, sendPartnerRedemptionEmail } from '../../../shared/email/email-service.js';
 
 export type CreateAdvantageInput = {
@@ -16,10 +17,10 @@ function generateCode(): string {
   return randomBytes(4).toString('hex').toUpperCase();
 }
 
-export function createAdvantageService(app: FastifyInstance) {
+export function createAdvantageService(prisma: PrismaClient) {
   return {
     async list() {
-      return app.prisma.advantage.findMany({
+      return prisma.advantage.findMany({
         where: { isActive: true },
         include: { partner: { include: { user: true } } },
         orderBy: { createdAt: 'desc' }
@@ -27,7 +28,7 @@ export function createAdvantageService(app: FastifyInstance) {
     },
 
     async listByPartner(partnerId: string) {
-      return app.prisma.advantage.findMany({
+      return prisma.advantage.findMany({
         where: { partnerId },
         include: { partner: { include: { user: true } } },
         orderBy: { createdAt: 'desc' }
@@ -35,25 +36,25 @@ export function createAdvantageService(app: FastifyInstance) {
     },
 
     async findById(id: string) {
-      return app.prisma.advantage.findUnique({
+      return prisma.advantage.findUnique({
         where: { id },
         include: { partner: { include: { user: true } } }
       });
     },
 
     async create(partnerId: string, input: CreateAdvantageInput) {
-      return app.prisma.advantage.create({
+      return prisma.advantage.create({
         data: { ...input, partnerId },
         include: { partner: { include: { user: true } } }
       });
     },
 
     async update(id: string, partnerId: string, input: UpdateAdvantageInput) {
-      const advantage = await app.prisma.advantage.findUnique({ where: { id } });
+      const advantage = await prisma.advantage.findUnique({ where: { id } });
       if (!advantage) throw DomainErrors.advantageNotFound();
       if (advantage.partnerId !== partnerId) throw DomainErrors.advantageOwnership();
 
-      return app.prisma.advantage.update({
+      return prisma.advantage.update({
         where: { id },
         data: input,
         include: { partner: { include: { user: true } } }
@@ -61,33 +62,35 @@ export function createAdvantageService(app: FastifyInstance) {
     },
 
     async delete(id: string, requesterId: string, requesterRole: string) {
-      const advantage = await app.prisma.advantage.findUnique({ where: { id } });
+      const advantage = await prisma.advantage.findUnique({ where: { id } });
       if (!advantage) throw DomainErrors.advantageNotFound();
       if (requesterRole !== 'admin' && advantage.partnerId !== requesterId) {
         throw DomainErrors.advantageOwnership();
       }
-      await app.prisma.advantage.delete({ where: { id } });
+      await prisma.advantage.delete({ where: { id } });
       return advantage;
     },
 
     async redeem(advantageId: string, studentId: string) {
-      const advantage = await app.prisma.advantage.findUnique({
+      const advantage = await prisma.advantage.findUnique({
         where: { id: advantageId },
         include: { partner: { include: { user: true } } }
       });
       if (!advantage) throw DomainErrors.advantageNotFound();
       if (!advantage.isActive) throw DomainErrors.advantageInactive();
 
-      const student = await app.prisma.student.findUnique({
+      const student = await prisma.student.findUnique({
         where: { id: studentId },
         include: { user: true }
       });
       if (!student) throw DomainErrors.studentNotFound();
-      if (student.coinBalance < advantage.costInCoins) throw DomainErrors.insufficientBalance();
+      if (!CoinBalance.create(student.coinBalance).canDeduct(advantage.costInCoins)) {
+        throw DomainErrors.insufficientBalance();
+      }
 
       const code = generateCode();
 
-      const redemption = await app.prisma.$transaction(async (tx) => {
+      const redemption = await prisma.$transaction(async (tx) => {
         await tx.student.update({
           where: { id: studentId },
           data: { coinBalance: { decrement: advantage.costInCoins } }
@@ -120,9 +123,42 @@ export function createAdvantageService(app: FastifyInstance) {
     },
 
     async listRedemptionsByStudent(studentId: string) {
-      return app.prisma.redemption.findMany({
+      return prisma.redemption.findMany({
         where: { studentId },
-        include: { advantage: { include: { partner: true } } },
+        include: {
+          advantage: { include: { partner: true } },
+          student: { include: { user: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+    },
+
+    async listRedemptionsByAdvantage(advantageId: string, requesterId: string, requesterRole: string) {
+      const advantage = await prisma.advantage.findUnique({ where: { id: advantageId } });
+      if (!advantage) throw DomainErrors.advantageNotFound();
+      if (requesterRole === 'partner' && advantage.partnerId !== requesterId) {
+        throw DomainErrors.advantageOwnership();
+      }
+      const where = requesterRole === 'student'
+        ? { advantageId, studentId: requesterId }
+        : { advantageId };
+      return prisma.redemption.findMany({
+        where,
+        include: {
+          advantage: { include: { partner: true } },
+          student: { include: { user: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+    },
+
+    async listPartnerRedemptions(partnerId: string) {
+      return prisma.redemption.findMany({
+        where: { advantage: { partnerId } },
+        include: {
+          advantage: { include: { partner: true } },
+          student: { include: { user: true } }
+        },
         orderBy: { createdAt: 'desc' }
       });
     }

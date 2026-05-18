@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Alert } from '../../../shared/components/Alert';
 import { Button } from '../../../shared/components/Button';
 import { PageHeader } from '../../../shared/components/PageHeader';
+import { SearchInput } from '../../../shared/components/SearchInput';
 import { formatCnpj } from '../../../shared/utils/formatters';
 import { approveParceiro, deleteParceiro, listParceiros } from '../services/parceiroService';
 import type { Parceiro } from '../types/parceiro';
@@ -12,6 +13,7 @@ type Tab = 'all' | 'pending' | 'approved';
 
 export function ParceiroListPage() {
   const [parceiros, setParceiros] = useState<Parceiro[]>([]);
+  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<Tab>('all');
@@ -64,6 +66,14 @@ export function ParceiroListPage() {
   }, []);
 
   const pendingCount = parceiros.filter((p) => p.status === 'pending').length;
+  const q = query.toLowerCase();
+  const filtered = parceiros.filter(
+    (p) =>
+      (p.tradeName ?? '').toLowerCase().includes(q) ||
+      p.corporateName.toLowerCase().includes(q) ||
+      p.email.toLowerCase().includes(q) ||
+      p.cnpj.includes(q.replace(/\D/g, ''))
+  );
 
   return (
     <section className="stack">
@@ -85,7 +95,11 @@ export function ParceiroListPage() {
 
       {error ? <Alert tone="error">{error}</Alert> : null}
 
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--color-border, #e2e8f0)', marginBottom: '-1px' }}>
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.25rem' }}>
+        <SearchInput value={query} onChange={setQuery} placeholder="Buscar por nome, email ou CNPJ..." />
+      </div>
+
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--color-line)', marginBottom: '-1px' }}>
         {(['all', 'pending', 'approved'] as Tab[]).map((t) => (
           <button
             key={t}
@@ -94,11 +108,11 @@ export function ParceiroListPage() {
             style={{
               background: 'none',
               border: 'none',
-              borderBottom: tab === t ? '2px solid var(--color-primary, #2563eb)' : '2px solid transparent',
+              borderBottom: tab === t ? '2px solid var(--color-puc-blue)' : '2px solid transparent',
               padding: '0.5rem 1rem',
               cursor: 'pointer',
               fontWeight: tab === t ? 600 : 400,
-              color: tab === t ? 'var(--color-primary, #2563eb)' : 'inherit',
+              color: tab === t ? 'var(--color-puc-blue)' : 'var(--color-muted)',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.375rem',
@@ -130,15 +144,19 @@ export function ParceiroListPage() {
       <div className="table-card">
         {loading ? (
           <div className="empty-state">Carregando parceiros...</div>
-        ) : parceiros.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="empty-state">
             <strong>
-              {tab === 'pending' ? 'Nenhuma solicitacao pendente' : 'Nenhuma empresa parceira cadastrada'}
+              {parceiros.length === 0
+                ? tab === 'pending' ? 'Nenhuma solicitacao pendente' : 'Nenhuma empresa parceira cadastrada'
+                : 'Nenhum resultado para a busca'}
             </strong>
             <span>
-              {tab === 'pending'
-                ? 'Quando empresas se cadastrarem pelo link publico, aparecera aqui.'
-                : 'Use o botao novo parceiro para iniciar o cadastro.'}
+              {parceiros.length === 0
+                ? tab === 'pending'
+                  ? 'Quando empresas se cadastrarem pelo link publico, aparecera aqui.'
+                  : 'Use o botao novo parceiro para iniciar o cadastro.'
+                : 'Tente outros termos.'}
             </span>
           </div>
         ) : (
@@ -155,7 +173,7 @@ export function ParceiroListPage() {
                 </tr>
               </thead>
               <tbody>
-                {parceiros.map((parceiro) => (
+                {filtered.map((parceiro) => (
                   <tr key={parceiro.id}>
                     <td>
                       <strong>{parceiro.tradeName || parceiro.corporateName}</strong>

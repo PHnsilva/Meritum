@@ -4,11 +4,13 @@ import { Link } from 'react-router-dom';
 import { Alert } from '../../../shared/components/Alert';
 import { Button } from '../../../shared/components/Button';
 import { PageHeader } from '../../../shared/components/PageHeader';
+import { SearchInput } from '../../../shared/components/SearchInput';
 import { deleteInstituicao, listInstituicoes } from '../services/instituicaoService';
 import type { Instituicao } from '../types/instituicao';
 
 export function InstituicaoListPage() {
   const [instituicoes, setInstituicoes] = useState<Instituicao[]>([]);
+  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -42,6 +44,8 @@ export function InstituicaoListPage() {
     void loadInstituicoes();
   }, []);
 
+  const filtered = instituicoes.filter((i) => i.name.toLowerCase().includes(query.toLowerCase()));
+
   return (
     <section className="stack">
       <PageHeader
@@ -62,13 +66,17 @@ export function InstituicaoListPage() {
 
       {error ? <Alert tone="error">{error}</Alert> : null}
 
+      <div className="work-panel" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <SearchInput value={query} onChange={setQuery} placeholder="Buscar por nome..." />
+      </div>
+
       <div className="table-card">
         {loading ? (
           <div className="empty-state">Carregando instituicoes...</div>
-        ) : instituicoes.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="empty-state">
-            <strong>Nenhuma instituicao cadastrada</strong>
-            <span>Cadastre uma instituicao para liberar o cadastro de alunos.</span>
+            <strong>{instituicoes.length === 0 ? 'Nenhuma instituicao cadastrada' : 'Nenhum resultado para a busca'}</strong>
+            <span>{instituicoes.length === 0 ? 'Cadastre uma instituicao para liberar o cadastro de alunos.' : 'Tente outros termos.'}</span>
           </div>
         ) : (
           <div className="responsive-table">
@@ -81,7 +89,7 @@ export function InstituicaoListPage() {
                 </tr>
               </thead>
               <tbody>
-                {instituicoes.map((instituicao) => (
+                {filtered.map((instituicao) => (
                   <tr key={instituicao.id}>
                     <td>
                       <strong>{instituicao.name}</strong>

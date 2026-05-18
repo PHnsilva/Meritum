@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { PrismaClient } from '@prisma/client';
 import { CPF } from '../../../shared/domain/value-objects/cpf.js';
 import { EmailVO } from '../../../shared/domain/value-objects/email-vo.js';
 import { DomainErrors } from '../../../shared/errors/domain-errors.js';
@@ -21,28 +21,28 @@ export type UpdateStudentInput = Partial<Omit<CreateStudentInput, 'password'>> &
   password?: string;
 };
 
-export function createStudentService(app: FastifyInstance) {
-  const institutionService = createInstitutionService(app);
+export function createStudentService(prisma: PrismaClient) {
+  const institutionService = createInstitutionService(prisma);
 
   return {
     async list(institutionId?: string, page = 1, limit = 50) {
       const where = institutionId ? { institutionId } : undefined;
       const p = paginate(page, limit);
       const [data, total] = await Promise.all([
-        app.prisma.student.findMany({
+        prisma.student.findMany({
           where,
           include: { user: true, institution: true },
           orderBy: { createdAt: 'desc' },
           skip: p.skip,
           take: p.take
         }),
-        app.prisma.student.count({ where })
+        prisma.student.count({ where })
       ]);
       return toPaginatedResult(data, total, p.page, p.limit);
     },
 
     findById(id: string) {
-      return app.prisma.student.findUnique({
+      return prisma.student.findUnique({
         where: { id },
         include: { user: true, institution: true }
       });
@@ -53,7 +53,7 @@ export function createStudentService(app: FastifyInstance) {
       CPF.create(input.cpf);
       await institutionService.findByIdOrThrow(input.institutionId);
 
-      return app.prisma.$transaction(async (tx) => {
+      return prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
           data: {
             name: input.name,
@@ -82,10 +82,10 @@ export function createStudentService(app: FastifyInstance) {
       if (input.cpf) CPF.create(input.cpf);
       if (input.institutionId) await institutionService.findByIdOrThrow(input.institutionId);
 
-      const student = await app.prisma.student.findUnique({ where: { id }, include: { user: true } });
+      const student = await prisma.student.findUnique({ where: { id }, include: { user: true } });
       if (!student) return null;
 
-      return app.prisma.$transaction(async (tx) => {
+      return prisma.$transaction(async (tx) => {
         if (input.name || input.email || input.cpf || input.password) {
           await tx.user.update({
             where: { id: student.userId },
@@ -112,9 +112,9 @@ export function createStudentService(app: FastifyInstance) {
     },
 
     async delete(id: string) {
-      const student = await app.prisma.student.findUnique({ where: { id } });
+      const student = await prisma.student.findUnique({ where: { id } });
       if (!student) return null;
-      await app.prisma.user.delete({ where: { id: student.userId } });
+      await prisma.user.delete({ where: { id: student.userId } });
       return student;
     }
   };

@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+﻿import type { FastifyInstance } from 'fastify';
 import { createAuthService } from '../../auth/application/auth-service.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { sendProfessorActivationEmail } from '../../../shared/email/email-service.js';
@@ -6,7 +6,7 @@ import { sendProfessorActivationEmail } from '../../../shared/email/email-servic
 const messageSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
 export async function professorActivationRoutes(app: FastifyInstance) {
-  const authService = createAuthService(app);
+  const authService = createAuthService(app.prisma);
 
   app.post<{ Body: { email: string } }>('/api/professores/ativar', {
     config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
@@ -55,3 +55,4 @@ export async function professorActivationRoutes(app: FastifyInstance) {
     }
   });
 }
+

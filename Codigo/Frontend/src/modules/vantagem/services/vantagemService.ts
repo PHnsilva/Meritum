@@ -32,3 +32,11 @@ export function resgatarVantagem(id: string): Promise<Resgate> {
 export function listMeusResgates(): Promise<Resgate[]> {
   return apiClient<Resgate[]>('/api/resgates');
 }
+
+export function listResgatesByVantagem(id: string): Promise<Resgate[]> {
+  return apiClient<Resgate[]>(`/api/vantagens/${id}/resgates`);
+}
+
+export function listPartnerResgates(): Promise<Resgate[]> {
+  return apiClient<Resgate[]>('/api/vantagens/resgates');
+}

@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+﻿import type { FastifyInstance } from 'fastify';
 import { createAuthService, type LoginInput, type UpdatePerfilInput } from '../application/auth-service.js';
 import { toAuthUserResponse } from '../responder/auth-responder.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
@@ -30,7 +30,7 @@ const tokenSchema = { type: 'object', properties: { token: { type: 'string' } } 
 type PerfilBody = { entityId: string } & UpdatePerfilInput;
 
 export async function authRoutes(app: FastifyInstance) {
-  const authService = createAuthService(app);
+  const authService = createAuthService(app.prisma);
 
   app.post<{ Body: LoginInput }>('/api/auth/login', {
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
@@ -100,3 +100,4 @@ export async function authRoutes(app: FastifyInstance) {
     }
   });
 }
+

@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { PrismaClient } from '@prisma/client';
 import { DomainErrors } from '../../../shared/errors/domain-errors.js';
 
 export type CreateInstitutionInput = {
@@ -7,26 +7,26 @@ export type CreateInstitutionInput = {
 
 export type UpdateInstitutionInput = Partial<CreateInstitutionInput>;
 
-export function createInstitutionService(app: FastifyInstance) {
+export function createInstitutionService(prisma: PrismaClient) {
   return {
     list() {
-      return app.prisma.institution.findMany({
+      return prisma.institution.findMany({
         orderBy: { name: 'asc' }
       });
     },
 
     findById(id: string) {
-      return app.prisma.institution.findUnique({ where: { id } });
+      return prisma.institution.findUnique({ where: { id } });
     },
 
     async findByIdOrThrow(id: string) {
-      const institution = await app.prisma.institution.findUnique({ where: { id } });
+      const institution = await prisma.institution.findUnique({ where: { id } });
       if (!institution) throw DomainErrors.institutionNotFound();
       return institution;
     },
 
     create(input: CreateInstitutionInput) {
-      return app.prisma.institution.create({
+      return prisma.institution.create({
         data: {
           name: input.name.trim()
         }
@@ -34,7 +34,7 @@ export function createInstitutionService(app: FastifyInstance) {
     },
 
     async update(id: string, input: UpdateInstitutionInput) {
-      const institution = await app.prisma.institution.findUnique({
+      const institution = await prisma.institution.findUnique({
         where: { id }
       });
 
@@ -42,7 +42,7 @@ export function createInstitutionService(app: FastifyInstance) {
         return null;
       }
 
-      return app.prisma.institution.update({
+      return prisma.institution.update({
         where: { id },
         data: {
           name: input.name?.trim()
@@ -51,7 +51,7 @@ export function createInstitutionService(app: FastifyInstance) {
     },
 
     async delete(id: string) {
-      const institution = await app.prisma.institution.findUnique({
+      const institution = await prisma.institution.findUnique({
         where: { id }
       });
 
@@ -59,7 +59,7 @@ export function createInstitutionService(app: FastifyInstance) {
         return null;
       }
 
-      await app.prisma.institution.delete({
+      await prisma.institution.delete({
         where: { id }
       });
 

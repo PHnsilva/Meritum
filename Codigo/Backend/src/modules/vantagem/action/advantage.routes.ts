@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+﻿import type { FastifyInstance } from 'fastify';
 import { requireRole } from '../../../shared/auth/require-role.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { createAdvantageService, type CreateAdvantageInput, type UpdateAdvantageInput } from '../application/advantage-service.js';
@@ -45,7 +45,7 @@ const bodySchema = {
 const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
 export async function advantageRoutes(app: FastifyInstance) {
-  const service = createAdvantageService(app);
+  const service = createAdvantageService(app.prisma);
 
   // All authenticated — catalog (active advantages only)
   app.get('/api/vantagens', {
@@ -72,6 +72,39 @@ export async function advantageRoutes(app: FastifyInstance) {
     const { sub } = request.user as { sub: string };
     const list = await service.listByPartner(sub);
     return toAdvantageListResponse(list);
+  });
+
+  // Partner — all redemptions across their advantages
+  app.get('/api/vantagens/resgates', {
+    preHandler: [app.authenticate, requireRole('partner')],
+    schema: {
+      tags: ['Vantagens'],
+      summary: 'Lista todos os resgates das vantagens da empresa parceira',
+      response: { 200: { type: 'array', items: redemptionSchema } }
+    }
+  }, async (request) => {
+    const { sub } = request.user as { sub: string };
+    const list = await service.listPartnerRedemptions(sub);
+    return list.map(toRedemptionResponse);
+  });
+
+  // Partner or student — redemptions for a specific advantage
+  app.get<{ Params: { id: string } }>('/api/vantagens/:id/resgates', {
+    preHandler: [app.authenticate, requireRole('partner', 'student')],
+    schema: {
+      tags: ['Vantagens'],
+      summary: 'Lista resgates de uma vantagem (parceiro ve todos; aluno ve os seus)',
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      response: { 200: { type: 'array', items: redemptionSchema }, 403: errorSchema, 404: errorSchema }
+    }
+  }, async (request, reply) => {
+    try {
+      const { sub, role } = request.user as { sub: string; role: string };
+      const list = await service.listRedemptionsByAdvantage(request.params.id, sub, role);
+      return list.map(toRedemptionResponse);
+    } catch (error) {
+      return sendErrorResponse(reply, error);
+    }
   });
 
   app.get<{ Params: { id: string } }>('/api/vantagens/:id', {
@@ -182,3 +215,4 @@ export async function advantageRoutes(app: FastifyInstance) {
     return list.map(toRedemptionResponse);
   });
 }
+

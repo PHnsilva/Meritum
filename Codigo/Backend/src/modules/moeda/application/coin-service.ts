@@ -1,5 +1,6 @@
-import type { FastifyInstance } from 'fastify';
+import type { PrismaClient } from '@prisma/client';
 import { MoedasEnviadasEvent } from '../../../shared/domain/events/moedas-enviadas-event.js';
+import { eventBus } from '../../../shared/domain/events/event-bus.js';
 import { DomainErrors } from '../../../shared/errors/domain-errors.js';
 import { CoinBalance } from '../../../shared/domain/value-objects/coin-balance.js';
 import { createProfessorService } from '../../professor/application/professor-service.js';
@@ -12,10 +13,9 @@ export type EnviarMoedasInput = {
   motive: string;
 };
 
-
-export function createCoinService(app: FastifyInstance) {
-  const professorService = createProfessorService(app);
-  const studentService = createStudentService(app);
+export function createCoinService(prisma: PrismaClient) {
+  const professorService = createProfessorService(prisma);
+  const studentService = createStudentService(prisma);
 
   return {
     async enviarMoedas(input: EnviarMoedasInput) {
@@ -32,7 +32,7 @@ export function createCoinService(app: FastifyInstance) {
         throw DomainErrors.differentInstitution();
       }
 
-      const transaction = await app.prisma.$transaction(async (tx) => {
+      const transaction = await prisma.$transaction(async (tx) => {
         await tx.professor.update({
           where: { id: input.professorId },
           data: { coinBalance: { decrement: input.amount } }
@@ -55,7 +55,7 @@ export function createCoinService(app: FastifyInstance) {
         });
       });
 
-      const event = new MoedasEnviadasEvent(
+      eventBus.publish(new MoedasEnviadasEvent(
         input.professorId,
         professor.user.name,
         professor.user.email,
@@ -64,16 +64,16 @@ export function createCoinService(app: FastifyInstance) {
         student.user.email,
         input.amount,
         input.motive
-      );
+      ));
 
-      return { transaction, event };
+      return transaction;
     },
 
     async extratoProfessor(professorId: string) {
       const professor = await professorService.findById(professorId);
       if (!professor) throw DomainErrors.professorNotFound();
 
-      const transactions = await app.prisma.transaction.findMany({
+      const transactions = await prisma.transaction.findMany({
         where: { professorId },
         include: { student: { include: { user: true } } },
         orderBy: { createdAt: 'desc' }
@@ -86,7 +86,7 @@ export function createCoinService(app: FastifyInstance) {
       const student = await studentService.findById(studentId);
       if (!student) throw DomainErrors.studentNotFound();
 
-      const transactions = await app.prisma.transaction.findMany({
+      const transactions = await prisma.transaction.findMany({
         where: { studentId },
         include: { professor: { include: { user: true } } },
         orderBy: { createdAt: 'desc' }

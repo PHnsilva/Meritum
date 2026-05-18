@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+﻿import type { FastifyInstance } from 'fastify';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
 import { createPartnerCompanyService, type CreatePartnerCompanyInput, type RegisterPartnerCompanyInput, type UpdatePartnerCompanyInput } from '../application/partner-company-service.js';
@@ -52,7 +52,7 @@ const paginatedPartnerSchema = {
 } as const;
 
 export async function partnerCompanyRoutes(app: FastifyInstance) {
-  const service = createPartnerCompanyService(app);
+  const service = createPartnerCompanyService(app.prisma);
 
   // Public: partner self-registration (status = PENDING)
   app.post<{ Body: RegisterPartnerCompanyInput }>('/api/parceiros/solicitar', {
@@ -175,3 +175,4 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 }
+

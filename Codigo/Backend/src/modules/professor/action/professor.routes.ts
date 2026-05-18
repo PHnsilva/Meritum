@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+﻿import type { FastifyInstance } from 'fastify';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
 import { createProfessorService, type CreateProfessorInput, type UpdateProfessorInput } from '../application/professor-service.js';
@@ -57,7 +57,7 @@ const paginatedProfessorSchema = {
 } as const;
 
 export async function professorRoutes(app: FastifyInstance) {
-  const service = createProfessorService(app);
+  const service = createProfessorService(app.prisma);
 
   app.get<{ Querystring: { page?: number; limit?: number } }>('/api/professores', {
     preHandler: [app.authenticate, requireRole('admin')],
@@ -143,3 +143,4 @@ export async function professorRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 }
+

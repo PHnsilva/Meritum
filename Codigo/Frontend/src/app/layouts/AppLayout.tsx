@@ -63,6 +63,12 @@ export function AppLayout() {
           </div>
           <div className="brand-pattern" aria-hidden="true" />
           <div className="topbar-actions">
+            {user?.coinBalance != null && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'var(--color-surface-strong)', color: 'var(--color-puc-blue)', borderRadius: '9999px', padding: '0.25rem 0.75rem', fontSize: '0.82rem', fontWeight: 700 }}>
+                <Coins size={13} />
+                {user.coinBalance}
+              </div>
+            )}
             <div className="user-area">
               <strong>{user?.name ?? 'Usuario'}</strong>
               <span>{user?.email ?? 'sessao local'}</span>

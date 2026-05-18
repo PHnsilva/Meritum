@@ -47,6 +47,12 @@ function RoleGuard({ blocked, children }: { blocked: UserRole[]; children: React
   return <>{children}</>;
 }
 
+function VantagemPage() {
+  const user = getStoredUser();
+  if (user?.role === 'partner') return <VantagemManagePage />;
+  return <VantagemCatalogPage />;
+}
+
 function HomeDashboard() {
   const user = getStoredUser();
   if (user?.role === 'student') return <StudentDashboardPage />;
@@ -93,11 +99,7 @@ export function AppRoutes() {
         <Route path="/perfil" element={<PerfilPage />} />
 
         {/* Vantagens — catalog visible to all; manage/create/edit partner only */}
-        <Route path="/vantagens" element={
-          getStoredUser()?.role === 'partner'
-            ? <VantagemManagePage />
-            : <VantagemCatalogPage />
-        } />
+        <Route path="/vantagens" element={<VantagemPage />} />
         <Route path="/vantagens/nova" element={<RoleGuard blocked={['student', 'professor', 'admin']}><VantagemCreatePage /></RoleGuard>} />
         <Route path="/vantagens/:id/editar" element={<RoleGuard blocked={['student', 'professor', 'admin']}><VantagemEditPage /></RoleGuard>} />
         <Route path="/catalogo" element={<VantagemCatalogPage />} />
