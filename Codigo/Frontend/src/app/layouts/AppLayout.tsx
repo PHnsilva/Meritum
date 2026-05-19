@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { clearStoredUser, getStoredUser } from '../../modules/auth/services/authService';
 import { Button } from '../../shared/components/Button';
 import { ThemeToggle } from '../../shared/components/ThemeToggle';
+import { Footer } from '../../shared/components/Footer';
 import type { UserRole } from '../../shared/types/api';
 
 type NavItem = { to: string; label: string; icon: React.ElementType };
@@ -119,6 +120,8 @@ export function AppLayout() {
       <main className="content">
         <Outlet />
       </main>
+
+      <Footer />
     </div>
   );
 }
