@@ -14,6 +14,7 @@ import { professorActivationRoutes } from './modules/professor/action/professor-
 import { authRoutes } from './modules/auth/action/auth.routes.js';
 import { coinRoutes } from './modules/moeda/action/coin.routes.js';
 import { advantageRoutes } from './modules/vantagem/action/advantage.routes.js';
+import { newsRoutes } from './modules/news/action/news.routes.js';
 import { eventBus } from './shared/domain/events/event-bus.js';
 import { MoedasEnviadasEvent } from './shared/domain/events/moedas-enviadas-event.js';
 import { VantagemResgataEvent } from './shared/domain/events/vantagem-resgata-event.js';
@@ -178,6 +179,7 @@ export async function buildApp() {
   await app.register(professorActivationRoutes);
   await app.register(coinRoutes);
   await app.register(advantageRoutes);
+  await app.register(newsRoutes);
 
   return app;
 }

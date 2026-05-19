@@ -12,7 +12,7 @@ const perfilItem: NavItem = { to: '/perfil', label: 'Minha Conta', icon: UserCog
 
 const navByRole: Record<UserRole, NavItem[]> = {
   admin: [
-    { to: '/', label: 'Painel', icon: LayoutDashboard },
+    { to: '/', label: 'Portal', icon: LayoutDashboard },
     { to: '/instituicoes', label: 'Instituicoes', icon: Landmark },
     { to: '/alunos', label: 'Alunos', icon: GraduationCap },
     { to: '/professores', label: 'Professores', icon: BookOpen },
@@ -22,24 +22,24 @@ const navByRole: Record<UserRole, NavItem[]> = {
     perfilItem
   ],
   student: [
-    { to: '/', label: 'Painel', icon: LayoutDashboard },
+    { to: '/', label: 'Portal', icon: LayoutDashboard },
     { to: '/moedas/extrato/aluno', label: 'Meu Extrato', icon: FileText },
     { to: '/vantagens', label: 'Vantagens', icon: Gift },
     perfilItem
   ],
   professor: [
-    { to: '/', label: 'Painel', icon: LayoutDashboard },
+    { to: '/', label: 'Portal', icon: LayoutDashboard },
     { to: '/moedas', label: 'Enviar Moedas', icon: Coins },
     { to: '/moedas/extrato/professor', label: 'Meu Extrato', icon: FileText },
     perfilItem
   ],
   partner: [
-    { to: '/', label: 'Painel', icon: LayoutDashboard },
+    { to: '/', label: 'Portal', icon: LayoutDashboard },
     { to: '/vantagens', label: 'Vantagens', icon: Gift },
     perfilItem
   ],
   institution: [
-    { to: '/', label: 'Painel', icon: LayoutDashboard },
+    { to: '/', label: 'Portal', icon: LayoutDashboard },
     { to: '/alunos', label: 'Alunos', icon: GraduationCap },
     { to: '/professores', label: 'Professores', icon: BookOpen },
     { to: '/instituicao/transacoes', label: 'Transacoes', icon: Coins },
