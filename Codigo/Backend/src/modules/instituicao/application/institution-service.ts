@@ -1,14 +1,22 @@
 import { hashPassword } from '../../../shared/security/password-hasher.js';
 import { EmailVO } from '../../../shared/domain/value-objects/email-vo.js';
 import { DomainErrors } from '../../../shared/errors/domain-errors.js';
-import { sendInstitutionRegistrationEmail, sendInstitutionApprovalEmail } from '../../../shared/email/email-service.js';
+import { eventBus } from '../../../shared/domain/events/event-bus.js';
+import { InstituicaoRegistradaEvent } from '../../../shared/domain/events/instituicao-registrada-event.js';
+import { InstituicaoAprovadaEvent } from '../../../shared/domain/events/instituicao-aprovada-event.js';
 import type { InstitutionRepository } from '../domain/institution.repository.js';
+import type { CoinQueryPort } from '../../../shared/domain/ports/coin-query.port.js';
+import type { AdvantageQueryPort } from '../../../shared/domain/ports/advantage-query.port.js';
 
 export type CreateInstitutionInput = { name: string };
 export type RegisterInstitutionInput = { name: string; email: string; password: string };
 export type UpdateInstitutionInput = Partial<{ name: string; email: string; password: string }>;
 
-export function createInstitutionService(institutionRepo: InstitutionRepository) {
+export function createInstitutionService(
+  institutionRepo: InstitutionRepository,
+  coinQueryPort: CoinQueryPort,
+  advantageQueryPort: AdvantageQueryPort
+) {
   return {
     list(status?: 'PENDING' | 'APPROVED') {
       return institutionRepo.findAll(status);
@@ -39,14 +47,14 @@ export function createInstitutionService(institutionRepo: InstitutionRepository)
         email: input.email,
         passwordHash: hashPassword(input.password)
       });
-      void sendInstitutionRegistrationEmail(result.userEmail, input.name);
+      eventBus.publish(new InstituicaoRegistradaEvent(result.institution.id, input.name, result.userEmail));
       return result.institution;
     },
 
     async approve(id: string) {
       const result = await institutionRepo.approve(id);
       if (!result) throw DomainErrors.institutionNotFound();
-      void sendInstitutionApprovalEmail(result.userEmail, result.userName);
+      eventBus.publish(new InstituicaoAprovadaEvent(result.institution.id, result.institution.name, result.userEmail, result.userName));
       return result.institution;
     },
 
@@ -63,8 +71,12 @@ export function createInstitutionService(institutionRepo: InstitutionRepository)
       await institutionRepo.updateLinkedUser(institutionId, data);
     },
 
-    getTransactions(institutionId: string) {
-      return institutionRepo.findTransactions(institutionId);
+    async getTransactions(institutionId: string) {
+      const [transactions, redemptions] = await Promise.all([
+        coinQueryPort.getInstitutionTransactions(institutionId),
+        advantageQueryPort.getInstitutionRedemptions(institutionId)
+      ]);
+      return { transactions, redemptions };
     },
 
     delete(id: string) {

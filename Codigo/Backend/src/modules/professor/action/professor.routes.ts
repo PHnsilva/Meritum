@@ -1,8 +1,7 @@
 ﻿import type { FastifyInstance } from 'fastify';
+import type { CreateProfessorInput, UpdateProfessorInput } from '../application/professor-service.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
-import { createProfessorService, type CreateProfessorInput, type UpdateProfessorInput } from '../application/professor-service.js';
-import { PrismaProfessorRepository } from '../infra/prisma-professor.repository.js';
 import { toProfessorListResponse, toProfessorResponse } from '../responder/professor-responder.js';
 
 const professorResponseSchema = {
@@ -58,7 +57,6 @@ const paginatedProfessorSchema = {
 } as const;
 
 export async function professorRoutes(app: FastifyInstance) {
-  const service = createProfessorService(new PrismaProfessorRepository(app.prisma));
 
   app.get<{ Querystring: { page?: number; limit?: number; institutionId?: string } }>('/api/professores', {
     preHandler: [app.authenticate, requireRole('admin', 'institution')],
@@ -77,7 +75,7 @@ export async function professorRoutes(app: FastifyInstance) {
     }
   }, async (request) => {
     const { page = 1, limit = 50, institutionId } = request.query;
-    const result = await service.list(page, limit, institutionId);
+    const result = await app.professorService.list(page, limit, institutionId);
     return { ...result, data: toProfessorListResponse(result.data) };
   });
 
@@ -90,7 +88,7 @@ export async function professorRoutes(app: FastifyInstance) {
       response: { 200: professorResponseSchema, 404: errorSchema }
     }
   }, async (request, reply) => {
-    const professor = await service.findById(request.params.id);
+    const professor = await app.professorService.findById(request.params.id);
     if (!professor) return reply.status(404).send({ message: 'Professor nao encontrado' });
     return toProfessorResponse(professor);
   });
@@ -105,7 +103,7 @@ export async function professorRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const professor = await service.create(request.body);
+      const professor = await app.professorService.create(request.body);
       return reply.status(201).send(toProfessorResponse(professor));
     } catch (error) {
       return sendErrorResponse(reply, error, 'Professor ja cadastrado com email ou CPF informado');
@@ -123,7 +121,7 @@ export async function professorRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const professor = await service.update(request.params.id, request.body);
+      const professor = await app.professorService.update(request.params.id, request.body);
       if (!professor) return reply.status(404).send({ message: 'Professor nao encontrado' });
       return toProfessorResponse(professor);
     } catch (error) {
@@ -140,7 +138,7 @@ export async function professorRoutes(app: FastifyInstance) {
       response: { 204: { type: 'null' }, 404: errorSchema }
     }
   }, async (request, reply) => {
-    const professor = await service.delete(request.params.id);
+    const professor = await app.professorService.delete(request.params.id);
     if (!professor) return reply.status(404).send({ message: 'Professor nao encontrado' });
     return reply.status(204).send();
   });

@@ -1,13 +1,8 @@
 import type { FastifyInstance } from 'fastify';
+import type { CreateInstitutionInput, RegisterInstitutionInput, UpdateInstitutionInput } from '../application/institution-service.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
-import {
-  createInstitutionService,
-  type CreateInstitutionInput,
-  type RegisterInstitutionInput,
-  type UpdateInstitutionInput
-} from '../application/institution-service.js';
-import { PrismaInstitutionRepository } from '../infra/prisma-institution.repository.js';
+
 import { toInstitutionListResponse, toInstitutionResponse } from '../responder/institution-responder.js';
 
 const institutionResponseSchema = {
@@ -37,7 +32,6 @@ const paginatedInstitutionSchema = {
 } as const;
 
 export async function institutionRoutes(app: FastifyInstance) {
-  const institutionService = createInstitutionService(new PrismaInstitutionRepository(app.prisma));
 
   // Public — student/professor self-registration select + institution self-registration
   app.get('/api/instituicoes', {
@@ -47,7 +41,7 @@ export async function institutionRoutes(app: FastifyInstance) {
       response: { 200: { type: 'array', items: institutionResponseSchema } }
     }
   }, async () => {
-    return toInstitutionListResponse(await institutionService.list('APPROVED'));
+    return toInstitutionListResponse(await app.institutionService.list('APPROVED'));
   });
 
   // Admin — all institutions with optional status filter
@@ -63,7 +57,7 @@ export async function institutionRoutes(app: FastifyInstance) {
       response: { 200: { type: 'array', items: institutionResponseSchema } }
     }
   }, async (request) => {
-    return toInstitutionListResponse(await institutionService.list(request.query.status));
+    return toInstitutionListResponse(await app.institutionService.list(request.query.status));
   });
 
   // Public — institution self-registration (status = PENDING, sends email)
@@ -85,7 +79,7 @@ export async function institutionRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const institution = await institutionService.register(request.body);
+      const institution = await app.institutionService.register(request.body);
       return reply.status(201).send(toInstitutionResponse(institution));
     } catch (error) {
       return sendErrorResponse(reply, error, 'Instituicao ja cadastrada com o nome ou email informado');
@@ -103,7 +97,7 @@ export async function institutionRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const institution = await institutionService.approve(request.params.id);
+      const institution = await app.institutionService.approve(request.params.id);
       return toInstitutionResponse(institution);
     } catch (error) {
       return sendErrorResponse(reply, error, 'Instituicao nao encontrada');
@@ -154,7 +148,7 @@ export async function institutionRoutes(app: FastifyInstance) {
     }
   }, async (request) => {
     const { sub } = request.user as { sub: string };
-    return institutionService.getTransactions(sub);
+    return app.institutionService.getTransactions(sub);
   });
 
   // Institution user — view own institution data
@@ -167,7 +161,7 @@ export async function institutionRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     const { sub } = request.user as { sub: string };
-    const institution = await institutionService.findById(sub);
+    const institution = await app.institutionService.findById(sub);
     if (!institution) return reply.status(404).send({ message: 'Instituicao nao encontrada' });
     return toInstitutionResponse(institution);
   });
@@ -191,7 +185,7 @@ export async function institutionRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     try {
       const { sub } = request.user as { sub: string };
-      await institutionService.updatePerfil(sub, request.body as { name?: string; email?: string });
+      await app.institutionService.updatePerfil(sub, request.body as { name?: string; email?: string });
       return { message: 'Perfil atualizado com sucesso' };
     } catch (error) {
       return sendErrorResponse(reply, error);
@@ -207,7 +201,7 @@ export async function institutionRoutes(app: FastifyInstance) {
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } }
     }
   }, async (request) => {
-    return institutionService.getTransactions(request.params.id);
+    return app.institutionService.getTransactions(request.params.id);
   });
 
   app.get<{ Params: { id: string } }>('/api/instituicoes/:id', {
@@ -219,7 +213,7 @@ export async function institutionRoutes(app: FastifyInstance) {
       response: { 200: institutionResponseSchema, 404: errorSchema }
     }
   }, async (request, reply) => {
-    const institution = await institutionService.findById(request.params.id);
+    const institution = await app.institutionService.findById(request.params.id);
     if (!institution) return reply.status(404).send({ message: 'Instituicao nao encontrada' });
     return toInstitutionResponse(institution);
   });
@@ -238,7 +232,7 @@ export async function institutionRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const institution = await institutionService.create(request.body);
+      const institution = await app.institutionService.create(request.body);
       return reply.status(201).send(toInstitutionResponse(institution));
     } catch (error) {
       return sendErrorResponse(reply, error, 'Instituicao ja cadastrada com o nome informado');
@@ -264,7 +258,7 @@ export async function institutionRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const institution = await institutionService.update(request.params.id, request.body);
+      const institution = await app.institutionService.update(request.params.id, request.body);
       if (!institution) return reply.status(404).send({ message: 'Instituicao nao encontrada' });
       return toInstitutionResponse(institution);
     } catch (error) {
@@ -282,7 +276,7 @@ export async function institutionRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const institution = await institutionService.delete(request.params.id);
+      const institution = await app.institutionService.delete(request.params.id);
       if (!institution) return reply.status(404).send({ message: 'Instituicao nao encontrada' });
       return reply.status(204).send();
     } catch (error) {

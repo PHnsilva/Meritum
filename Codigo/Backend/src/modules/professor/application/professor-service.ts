@@ -1,7 +1,11 @@
 import { CPF } from '../../../shared/domain/value-objects/cpf.js';
 import { EmailVO } from '../../../shared/domain/value-objects/email-vo.js';
+import { Department } from '../../../shared/domain/value-objects/department.js';
+import { ProfessorEntity } from '../domain/professor.entity.js';
 import { generateTempPassword, hashPassword } from '../../../shared/security/password-hasher.js';
 import { paginate, toPaginatedResult } from '../../../shared/pagination/pagination.js';
+import { eventBus } from '../../../shared/domain/events/event-bus.js';
+import { ProfessorCriadoEvent } from '../../../shared/domain/events/professor-criado-event.js';
 import type { ProfessorRepository } from '../domain/professor.repository.js';
 
 export type CreateProfessorInput = {
@@ -30,18 +34,24 @@ export function createProfessorService(professorRepo: ProfessorRepository) {
     },
 
     async create(input: CreateProfessorInput) {
-      EmailVO.create(input.email);
-      CPF.create(input.cpf);
-      return professorRepo.create({
+      const cpf = CPF.create(input.cpf);
+      const email = EmailVO.create(input.email);
+      const department = Department.create(input.department);
+
+      const tempPassword = generateTempPassword();
+      const professor = await professorRepo.create({
         ...input,
-        passwordHash: hashPassword(generateTempPassword()),
+        passwordHash: hashPassword(tempPassword),
         mustChangePassword: true
       });
+      eventBus.publish(new ProfessorCriadoEvent(professor.id, professor.user.name, professor.user.email, professor.institution.name, tempPassword));
+      return professor;
     },
 
     async update(id: string, input: UpdateProfessorInput) {
       if (input.email) EmailVO.create(input.email);
       if (input.cpf) CPF.create(input.cpf);
+      if (input.department) Department.create(input.department);
       return professorRepo.update(id, input);
     },
 

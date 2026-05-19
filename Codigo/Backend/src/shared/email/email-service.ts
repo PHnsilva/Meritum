@@ -221,6 +221,37 @@ function buildInstitutionApprovalHtml(name: string): string {
 </html>`;
 }
 
+function buildStudentWelcomeHtml(studentName: string, institutionName: string): string {
+  const frontendUrl = process.env['FRONTEND_URL'] ?? 'http://localhost:5173';
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><title>Meritum - Bem-vindo!</title></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;padding:32px">
+    <h1 style="color:#2563eb;margin-top:0">Meritum</h1>
+    <h2 style="color:#1e293b">Bem-vindo ao Meritum!</h2>
+    <p>Ola, <strong>${studentName}</strong>!</p>
+    <p>Sua conta no sistema Meritum foi criada com sucesso pela instituicao <strong>${institutionName}</strong>.</p>
+    <p>Voce ja pode acessar o sistema para:</p>
+    <ul style="color:#64748b;font-size:14px">
+      <li>Ver seu saldo de moedas</li>
+      <li>Consultar seu historico de recebimentos</li>
+      <li>Resgatar vantagens com seus professores</li>
+    </ul>
+    <div style="text-align:center;margin:32px 0">
+      <a href="${frontendUrl}/login" style="background:#2563eb;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">
+        Acessar o sistema
+      </a>
+    </div>
+    <p style="color:#64748b;font-size:14px">Se voce nao criou esta conta, ignore este email.</p>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
+    <p style="color:#94a3b8;font-size:12px">Sistema de Moeda Estudantil - Meritum</p>
+  </div>
+</body>
+</html>`;
+}
+
 async function sendWithNodemailer(opts: {
   to: string;
   subject: string;
@@ -359,5 +390,17 @@ export async function sendCoinSentConfirmationEmail(params: ProfessorSentEmailPa
     });
   } catch (err) {
     console.error('[email] Falha ao notificar professor:', err);
+  }
+}
+
+export async function sendStudentWelcomeEmail(studentEmail: string, studentName: string, institutionName: string): Promise<void> {
+  try {
+    await sendWithNodemailer({
+      to: studentEmail,
+      subject: 'Meritum: bem-vindo ao sistema!',
+      html: buildStudentWelcomeHtml(studentName, institutionName)
+    });
+  } catch (err) {
+    console.error('[email] Falha ao enviar email de boas-vindas ao aluno:', err);
   }
 }

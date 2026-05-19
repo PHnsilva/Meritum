@@ -1,8 +1,7 @@
 ﻿import type { FastifyInstance } from 'fastify';
+import type { CreateStudentInput, UpdateStudentInput } from '../application/student-service.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
-import { createStudentService, type CreateStudentInput, type UpdateStudentInput } from '../application/student-service.js';
-import { PrismaStudentRepository } from '../infra/prisma-student.repository.js';
 import { toStudentListResponse, toStudentResponse } from '../responder/student-responder.js';
 
 const studentResponseSchema = {
@@ -63,7 +62,6 @@ const paginatedStudentSchema = {
 } as const;
 
 export async function studentRoutes(app: FastifyInstance) {
-  const studentService = createStudentService(new PrismaStudentRepository(app.prisma));
 
   // Public — student self-registration
   app.post<{ Body: CreateStudentInput }>('/api/auth/register', {
@@ -76,7 +74,7 @@ export async function studentRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      await studentService.create(request.body);
+      await app.studentService.create(request.body);
       return reply.status(201).send({ message: 'Conta criada com sucesso. Faca login para continuar.' });
     } catch (error) {
       return sendErrorResponse(reply, error, 'Email, CPF ou RG ja cadastrado');
@@ -100,7 +98,7 @@ export async function studentRoutes(app: FastifyInstance) {
     }
   }, async (request) => {
     const { institutionId, page = 1, limit = 50 } = request.query;
-    const result = await studentService.list(institutionId, page, limit);
+    const result = await app.studentService.list(institutionId, page, limit);
     return { ...result, data: toStudentListResponse(result.data) };
   });
 
@@ -113,7 +111,7 @@ export async function studentRoutes(app: FastifyInstance) {
       response: { 200: studentResponseSchema, 404: errorSchema }
     }
   }, async (request, reply) => {
-    const student = await studentService.findById(request.params.id);
+    const student = await app.studentService.findById(request.params.id);
     if (!student) return reply.status(404).send({ message: 'Aluno nao encontrado' });
     return toStudentResponse(student);
   });
@@ -128,7 +126,7 @@ export async function studentRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const student = await studentService.create(request.body);
+      const student = await app.studentService.create(request.body);
       return reply.status(201).send(toStudentResponse(student));
     } catch (error) {
       return sendErrorResponse(reply, error, 'Aluno ja cadastrado com email, CPF ou RG informado');
@@ -146,7 +144,7 @@ export async function studentRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const student = await studentService.update(request.params.id, request.body);
+      const student = await app.studentService.update(request.params.id, request.body);
       if (!student) return reply.status(404).send({ message: 'Aluno nao encontrado' });
       return toStudentResponse(student);
     } catch (error) {
@@ -163,7 +161,7 @@ export async function studentRoutes(app: FastifyInstance) {
       response: { 204: { type: 'null' }, 404: errorSchema }
     }
   }, async (request, reply) => {
-    const student = await studentService.delete(request.params.id);
+    const student = await app.studentService.delete(request.params.id);
     if (!student) return reply.status(404).send({ message: 'Aluno nao encontrado' });
     return reply.status(204).send();
   });

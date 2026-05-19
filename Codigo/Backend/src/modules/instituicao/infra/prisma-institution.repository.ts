@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
-import type { InstitutionData, InstitutionRepository, InstitutionRedemption, InstitutionTransaction, RegisterInstitutionData } from '../domain/institution.repository.js';
+import type { InstitutionData, InstitutionRepository, RegisterInstitutionData } from '../domain/institution.repository.js';
 
 export class PrismaInstitutionRepository implements InstitutionRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -89,45 +89,6 @@ export class PrismaInstitutionRepository implements InstitutionRepository {
     });
   }
 
-  async findTransactions(institutionId: string): Promise<{ transactions: InstitutionTransaction[]; redemptions: InstitutionRedemption[] }> {
-    const [transactions, redemptions] = await Promise.all([
-      this.prisma.transaction.findMany({
-        where: { student: { institutionId } },
-        include: {
-          professor: { include: { user: true } },
-          student: { include: { user: true } }
-        },
-        orderBy: { createdAt: 'desc' }
-      }),
-      this.prisma.redemption.findMany({
-        where: { student: { institutionId } },
-        include: {
-          student: { include: { user: true } },
-          advantage: { include: { partner: { include: { user: true } } } }
-        },
-        orderBy: { createdAt: 'desc' }
-      })
-    ]);
-
-    return {
-      transactions: transactions.map((t) => ({
-        id: t.id,
-        amount: t.amount,
-        motive: t.motive,
-        createdAt: t.createdAt,
-        professor: { name: t.professor.user.name, email: t.professor.user.email, department: t.professor.department },
-        student: { name: t.student.user.name, email: t.student.user.email, course: t.student.course }
-      })),
-      redemptions: redemptions.map((r) => ({
-        id: r.id,
-        code: r.code,
-        coinCost: r.coinCost,
-        createdAt: r.createdAt,
-        student: { name: r.student.user.name, email: r.student.user.email },
-        advantage: { title: r.advantage.title, partner: { name: r.advantage.partner.corporateName } }
-      }))
-    };
-  }
 
   async delete(id: string): Promise<InstitutionData | null> {
     const existing = await this.prisma.institution.findUnique({ where: { id } });

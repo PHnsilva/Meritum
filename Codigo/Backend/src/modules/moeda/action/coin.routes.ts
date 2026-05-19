@@ -1,11 +1,8 @@
 import type { FastifyInstance } from 'fastify';
+import type { EnviarMoedasInput } from '../application/coin-service.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
-import { createUnitOfWork } from '../../../shared/infra/unit-of-work.js';
-import { PrismaProfessorBalanceRepository } from '../infra/prisma-professor-balance.repository.js';
-import { PrismaStudentBalanceRepository } from '../infra/prisma-student-balance.repository.js';
-import { PrismaTransactionRepository } from '../infra/prisma-transaction.repository.js';
-import { createCoinService, type EnviarMoedasInput } from '../application/coin-service.js';
+
 import { toExtratoResponse, toTransactionResponse } from '../responder/coin-responder.js';
 
 const transactionSchema = {
@@ -49,12 +46,6 @@ const extratoSchema = {
 const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
 export async function coinRoutes(app: FastifyInstance) {
-  const service = createCoinService(
-    new PrismaProfessorBalanceRepository(app.prisma),
-    new PrismaStudentBalanceRepository(app.prisma),
-    new PrismaTransactionRepository(app.prisma),
-    createUnitOfWork(app.prisma)
-  );
 
   app.post<{ Body: Omit<EnviarMoedasInput, 'professorId'> }>('/api/moedas/enviar', {
     preHandler: [app.authenticate, requireRole('professor')],
@@ -75,7 +66,7 @@ export async function coinRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     try {
       const { sub } = request.user as { sub: string };
-      const transaction = await service.enviarMoedas({ ...request.body, professorId: sub });
+      const transaction = await app.coinService.enviarMoedas({ ...request.body, professorId: sub });
       return reply.status(201).send(toTransactionResponse(transaction));
     } catch (error) {
       return sendErrorResponse(reply, error);
@@ -100,7 +91,7 @@ export async function coinRoutes(app: FastifyInstance) {
       if (role === 'professor' && sub !== request.params.professorId) {
         return reply.status(403).send({ message: 'Acesso negado: voce so pode ver seu proprio extrato' });
       }
-      const data = await service.extratoProfessor(request.params.professorId);
+      const data = await app.coinService.extratoProfessor(request.params.professorId);
       return toExtratoResponse(data);
     } catch (error) {
       return sendErrorResponse(reply, error);
@@ -121,7 +112,7 @@ export async function coinRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const data = await service.extratoAluno(request.params.studentId);
+      const data = await app.coinService.extratoAluno(request.params.studentId);
       return toExtratoResponse(data);
     } catch (error) {
       return sendErrorResponse(reply, error);

@@ -1,8 +1,7 @@
 ﻿import type { FastifyInstance } from 'fastify';
+import type { CreatePartnerCompanyInput, RegisterPartnerCompanyInput, UpdatePartnerCompanyInput } from '../application/partner-company-service.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
-import { createPartnerCompanyService, type CreatePartnerCompanyInput, type RegisterPartnerCompanyInput, type UpdatePartnerCompanyInput } from '../application/partner-company-service.js';
-import { PrismaPartnerRepository } from '../infra/prisma-partner.repository.js';
 import { toPartnerCompanyListResponse, toPartnerCompanyResponse } from '../responder/partner-company-responder.js';
 
 const partnerCompanyResponseSchema = {
@@ -53,7 +52,6 @@ const paginatedPartnerSchema = {
 } as const;
 
 export async function partnerCompanyRoutes(app: FastifyInstance) {
-  const service = createPartnerCompanyService(app.prisma, new PrismaPartnerRepository(app.prisma));
 
   // Public: partner self-registration (status = PENDING)
   app.post<{ Body: RegisterPartnerCompanyInput }>('/api/parceiros/solicitar', {
@@ -66,7 +64,7 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const partner = await service.register(request.body);
+      const partner = await app.partnerService.register(request.body);
       return reply.status(201).send(toPartnerCompanyResponse(partner));
     } catch (error) {
       return sendErrorResponse(reply, error, 'Empresa parceira ja cadastrada com email ou CNPJ informado');
@@ -84,7 +82,7 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const partner = await service.approve(request.params.id);
+      const partner = await app.partnerService.approve(request.params.id);
       return toPartnerCompanyResponse(partner);
     } catch (error) {
       return sendErrorResponse(reply, error, 'Empresa parceira nao encontrada');
@@ -108,7 +106,7 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
     }
   }, async (request) => {
     const { page = 1, limit = 50, status } = request.query;
-    const result = await service.list(page, limit, status);
+    const result = await app.partnerService.list(page, limit, status);
     return { ...result, data: toPartnerCompanyListResponse(result.data) };
   });
 
@@ -121,7 +119,7 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
       response: { 200: partnerCompanyResponseSchema, 404: errorSchema }
     }
   }, async (request, reply) => {
-    const partnerCompany = await service.findById(request.params.id);
+    const partnerCompany = await app.partnerService.findById(request.params.id);
     if (!partnerCompany) return reply.status(404).send({ message: 'Empresa parceira nao encontrada' });
     return toPartnerCompanyResponse(partnerCompany);
   });
@@ -136,7 +134,7 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const partnerCompany = await service.create(request.body);
+      const partnerCompany = await app.partnerService.create(request.body);
       return reply.status(201).send(toPartnerCompanyResponse(partnerCompany));
     } catch (error) {
       return sendErrorResponse(reply, error, 'Empresa parceira ja cadastrada com email ou CNPJ informado');
@@ -154,7 +152,7 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const partnerCompany = await service.update(request.params.id, request.body);
+      const partnerCompany = await app.partnerService.update(request.params.id, request.body);
       if (!partnerCompany) return reply.status(404).send({ message: 'Empresa parceira nao encontrada' });
       return toPartnerCompanyResponse(partnerCompany);
     } catch (error) {
@@ -171,7 +169,7 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
       response: { 204: { type: 'null' }, 404: errorSchema }
     }
   }, async (request, reply) => {
-    const partnerCompany = await service.delete(request.params.id);
+    const partnerCompany = await app.partnerService.delete(request.params.id);
     if (!partnerCompany) return reply.status(404).send({ message: 'Empresa parceira nao encontrada' });
     return reply.status(204).send();
   });

@@ -1,8 +1,9 @@
 import { randomBytes } from 'node:crypto';
-import type { PrismaClient } from '@prisma/client';
 import { DomainErrors } from '../../../shared/errors/domain-errors.js';
 import { CoinBalance } from '../../../shared/domain/value-objects/coin-balance.js';
-import { sendStudentCouponEmail, sendPartnerRedemptionEmail } from '../../../shared/email/email-service.js';
+import { eventBus } from '../../../shared/domain/events/event-bus.js';
+import { VantagemResgataEvent } from '../../../shared/domain/events/vantagem-resgata-event.js';
+import type { UnitOfWork } from '../../../shared/infra/unit-of-work.js';
 import type { AdvantageRepository } from '../domain/advantage.repository.js';
 import { AdvantageEntity } from '../domain/advantage.entity.js';
 import type { StudentCoinPort } from '../domain/student-coin.port.js';
@@ -20,126 +21,96 @@ function generateCode(): string {
   return randomBytes(4).toString('hex').toUpperCase();
 }
 
-export function createAdvantageService(prisma: PrismaClient, advantageRepo: AdvantageRepository, studentCoinPort: StudentCoinPort) {
+export function createAdvantageService(
+  advantageRepo: AdvantageRepository,
+  studentCoinPort: StudentCoinPort,
+  uow: UnitOfWork
+) {
   return {
-    async list() {
-      return prisma.advantage.findMany({
-        where: { isActive: true },
-        include: { partner: { include: { user: true } } },
-        orderBy: { createdAt: 'desc' }
-      });
+    list() {
+      return advantageRepo.list();
     },
 
-    async listByPartner(partnerId: string) {
-      return prisma.advantage.findMany({
-        where: { partnerId },
-        include: { partner: { include: { user: true } } },
-        orderBy: { createdAt: 'desc' }
-      });
+    listByPartner(partnerId: string) {
+      return advantageRepo.listByPartner(partnerId);
     },
 
-    async findById(id: string) {
-      return prisma.advantage.findUnique({
-        where: { id },
-        include: { partner: { include: { user: true } } }
-      });
+    findById(id: string) {
+      return advantageRepo.findByIdWithPartner(id);
     },
 
-    async create(partnerId: string, input: CreateAdvantageInput) {
-      return prisma.advantage.create({
-        data: { ...input, partnerId },
-        include: { partner: { include: { user: true } } }
-      });
+    create(partnerId: string, input: CreateAdvantageInput) {
+      return advantageRepo.create({ ...input, partnerId });
     },
 
-    async listAll() {
-      return prisma.advantage.findMany({
-        include: { partner: { include: { user: true } } },
-        orderBy: { createdAt: 'desc' }
-      });
+    listAll() {
+      return advantageRepo.listAll();
     },
 
     async update(id: string, requesterId: string, requesterRole: string, input: UpdateAdvantageInput) {
       const advantage = await advantageRepo.findById(id);
       if (!advantage) throw DomainErrors.advantageNotFound();
       advantage.verifyOwnership(requesterId, requesterRole);
-
-      return prisma.advantage.update({
-        where: { id },
-        data: input,
-        include: { partner: { include: { user: true } } }
-      });
+      return advantageRepo.update(id, input);
     },
 
     async delete(id: string, requesterId: string, requesterRole: string) {
       const advantage = await advantageRepo.findById(id);
       if (!advantage) throw DomainErrors.advantageNotFound();
       advantage.verifyOwnership(requesterId, requesterRole);
-
-      await prisma.advantage.delete({ where: { id } });
+      await advantageRepo.delete(id);
     },
 
     async redeem(advantageId: string, studentId: string) {
-      const advantageData = await prisma.advantage.findUnique({
-        where: { id: advantageId },
-        include: { partner: { include: { user: true } } }
-      });
+      const advantageData = await advantageRepo.findByIdWithPartner(advantageId);
       if (!advantageData) throw DomainErrors.advantageNotFound();
 
-      // Domain check via entity — no extra query needed
-      const advantage = new AdvantageEntity(advantageData.id, advantageData.partnerId, advantageData.title, advantageData.costInCoins, advantageData.isActive);
+      const advantage = new AdvantageEntity(
+        advantageData.id,
+        advantageData.partnerId,
+        advantageData.title,
+        advantageData.costInCoins,
+        advantageData.isActive
+      );
       advantage.assertAvailable();
 
       const student = await studentCoinPort.findById(studentId);
       if (!student) throw DomainErrors.studentNotFound();
-      // Eager check for a clear error message on the obvious case.
-      // The real guard is the conditional atomic decrement inside the TX below.
+
+      // Eager check for clear error on obvious case.
+      // Real guard is the conditional atomic decrement inside the TX.
       if (!CoinBalance.create(student.coinBalance).canDeduct(advantageData.costInCoins)) {
         throw DomainErrors.insufficientBalance();
       }
 
       const code = generateCode();
 
-      const redemption = await prisma.$transaction(async (tx) => {
-        // Atomic conditional decrement — real concurrency guard, balance cannot go negative.
+      const redemption = await uow.run(async (tx) => {
         const deducted = await studentCoinPort.deductCoins(studentId, advantageData.costInCoins, tx);
         if (!deducted) throw DomainErrors.insufficientBalance();
-
-        return tx.redemption.create({
-          data: { code, coinCost: advantageData.costInCoins, studentId, advantageId },
-          include: { advantage: { include: { partner: { include: { user: true } } } }, student: { include: { user: true } } }
-        });
+        return advantageRepo.createRedemption(
+          { code, coinCost: advantageData.costInCoins, studentId, advantageId },
+          tx
+        );
       });
 
-      void sendStudentCouponEmail(
+      eventBus.publish(new VantagemResgataEvent(
+        studentId,
+        student.user.name,
         student.user.email,
-        student.user.name,
+        advantageId,
         advantageData.title,
         advantageData.partner.corporateName,
-        advantageData.costInCoins,
-        code
-      );
-      void sendPartnerRedemptionEmail(
         advantageData.partner.user.email,
-        advantageData.partner.corporateName,
-        student.user.name,
-        advantageData.title,
         advantageData.costInCoins,
         code
-      );
+      ));
 
       return redemption;
     },
 
-    async listRedemptionsByStudent(studentId: string) {
-      return prisma.redemption.findMany({
-        where: { studentId },
-        include: {
-          advantage: { include: { partner: true } },
-          student: { include: { user: true } }
-        },
-        orderBy: { createdAt: 'desc' }
-      });
+    listRedemptionsByStudent(studentId: string) {
+      return advantageRepo.listRedemptionsByStudent(studentId);
     },
 
     async listRedemptionsByAdvantage(advantageId: string, requesterId: string, requesterRole: string) {
@@ -148,28 +119,12 @@ export function createAdvantageService(prisma: PrismaClient, advantageRepo: Adva
       if (requesterRole === 'partner' && advantage.partnerId !== requesterId) {
         throw DomainErrors.advantageOwnership();
       }
-      const where = requesterRole === 'student'
-        ? { advantageId, studentId: requesterId }
-        : { advantageId };
-      return prisma.redemption.findMany({
-        where,
-        include: {
-          advantage: { include: { partner: true } },
-          student: { include: { user: true } }
-        },
-        orderBy: { createdAt: 'desc' }
-      });
+      const filter = requesterRole === 'student' ? { studentId: requesterId } : undefined;
+      return advantageRepo.listRedemptionsByAdvantage(advantageId, filter);
     },
 
-    async listPartnerRedemptions(partnerId: string) {
-      return prisma.redemption.findMany({
-        where: { advantage: { partnerId } },
-        include: {
-          advantage: { include: { partner: true } },
-          student: { include: { user: true } }
-        },
-        orderBy: { createdAt: 'desc' }
-      });
-    }
+    listPartnerRedemptions(partnerId: string) {
+      return advantageRepo.listRedemptionsByPartner(partnerId);
+    },
   };
 }

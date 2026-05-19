@@ -1,9 +1,10 @@
-import type { PrismaClient } from '@prisma/client';
 import { EmailVO } from '../../../shared/domain/value-objects/email-vo.js';
 import { hashPassword } from '../../../shared/security/password-hasher.js';
 import { paginate, toPaginatedResult } from '../../../shared/pagination/pagination.js';
-import { sendPartnerApprovalEmail, sendPartnerRegistrationEmail } from '../../../shared/email/email-service.js';
 import { DomainErrors } from '../../../shared/errors/domain-errors.js';
+import { eventBus } from '../../../shared/domain/events/event-bus.js';
+import { ParceiroAprovadoEvent } from '../../../shared/domain/events/parceiro-aprovado-event.js';
+import { ParceiroRegistradoEvent } from '../../../shared/domain/events/parceiro-registrado-event.js';
 import type { PartnerRepository } from '../domain/partner.repository.js';
 
 export type CreatePartnerCompanyInput = {
@@ -16,139 +17,74 @@ export type CreatePartnerCompanyInput = {
 };
 
 export type UpdatePartnerCompanyInput = Partial<CreatePartnerCompanyInput>;
-
 export type RegisterPartnerCompanyInput = CreatePartnerCompanyInput;
 
-export function createPartnerCompanyService(prisma: PrismaClient, partnerRepo: PartnerRepository) {
+export function createPartnerCompanyService(partnerRepo: PartnerRepository) {
   return {
     async list(page = 1, limit = 50, status?: 'PENDING' | 'APPROVED') {
-      const where = status ? { status } : undefined;
       const p = paginate(page, limit);
+      const filter = status ? { status } : undefined;
       const [data, total] = await Promise.all([
-        prisma.partnerCompany.findMany({
-          where,
-          include: { user: true },
-          orderBy: { createdAt: 'desc' },
-          skip: p.skip,
-          take: p.take
-        }),
-        prisma.partnerCompany.count({ where })
+        partnerRepo.list(filter, p.skip, p.take),
+        partnerRepo.count(filter),
       ]);
       return toPaginatedResult(data, total, p.page, p.limit);
     },
 
     findById(id: string) {
-      return prisma.partnerCompany.findUnique({
-        where: { id },
-        include: { user: true }
+      return partnerRepo.findByIdFull(id);
+    },
+
+    async create(input: CreatePartnerCompanyInput) {
+      EmailVO.create(input.email);
+      return partnerRepo.create({
+        corporateName: input.corporateName,
+        tradeName: input.tradeName,
+        email: input.email,
+        cnpj: input.cnpj,
+        address: input.address,
+        passwordHash: hashPassword(input.password),
+        status: 'APPROVED',
       });
     },
 
-    create(input: CreatePartnerCompanyInput) {
+    async register(input: RegisterPartnerCompanyInput) {
       EmailVO.create(input.email);
-      return prisma.$transaction(async (tx) => {
-        const user = await tx.user.create({
-          data: {
-            name: input.corporateName,
-            email: input.email,
-            passwordHash: hashPassword(input.password),
-            role: 'PARTNER'
-          }
-        });
-
-        return tx.partnerCompany.create({
-          data: {
-            userId: user.id,
-            corporateName: input.corporateName,
-            tradeName: input.tradeName,
-            cnpj: input.cnpj,
-            address: input.address,
-            status: 'APPROVED'
-          },
-          include: { user: true }
-        });
+      const partner = await partnerRepo.create({
+        corporateName: input.corporateName,
+        tradeName: input.tradeName,
+        email: input.email,
+        cnpj: input.cnpj,
+        address: input.address,
+        passwordHash: hashPassword(input.password),
+        status: 'PENDING',
       });
-    },
-
-    register(input: RegisterPartnerCompanyInput) {
-      EmailVO.create(input.email);
-      return prisma.$transaction(async (tx) => {
-        const user = await tx.user.create({
-          data: {
-            name: input.corporateName,
-            email: input.email,
-            passwordHash: hashPassword(input.password),
-            role: 'PARTNER'
-          }
-        });
-
-        return tx.partnerCompany.create({
-          data: {
-            userId: user.id,
-            corporateName: input.corporateName,
-            tradeName: input.tradeName,
-            cnpj: input.cnpj,
-            address: input.address,
-            status: 'PENDING'
-          },
-          include: { user: true }
-        });
-      }).then((partner) => {
-        void sendPartnerRegistrationEmail(partner.user.email, partner.corporateName);
-        return partner;
-      });
+      eventBus.publish(new ParceiroRegistradoEvent(partner.id, partner.corporateName, partner.user.email));
+      return partner;
     },
 
     async approve(id: string) {
       const partner = await partnerRepo.findById(id);
       if (!partner) throw DomainErrors.partnerNotFound();
-
-      const updated = await prisma.partnerCompany.update({
-        where: { id },
-        data: { status: 'APPROVED' },
-        include: { user: true }
-      });
-
-      void sendPartnerApprovalEmail(partner.user.email, partner.corporateName);
-
+      const updated = await partnerRepo.approve(id);
+      eventBus.publish(new ParceiroAprovadoEvent(updated.id, updated.corporateName, updated.user.email));
       return updated;
     },
 
     async update(id: string, input: UpdatePartnerCompanyInput) {
       if (input.email) EmailVO.create(input.email);
-      const partnerCompany = await prisma.partnerCompany.findUnique({ where: { id }, include: { user: true } });
-      if (!partnerCompany) return null;
-
-      return prisma.$transaction(async (tx) => {
-        if (input.email || input.password || input.corporateName) {
-          await tx.user.update({
-            where: { id: partnerCompany.userId },
-            data: {
-              ...(input.corporateName ? { name: input.corporateName } : {}),
-              ...(input.email ? { email: input.email } : {}),
-              ...(input.password ? { passwordHash: hashPassword(input.password) } : {})
-            }
-          });
-        }
-
-        return tx.partnerCompany.update({
-          where: { id },
-          data: {
-            ...(input.corporateName ? { corporateName: input.corporateName } : {}),
-            ...(input.tradeName !== undefined ? { tradeName: input.tradeName } : {}),
-            ...(input.cnpj ? { cnpj: input.cnpj } : {}),
-            ...(input.address ? { address: input.address } : {})
-          },
-          include: { user: true }
-        });
+      return partnerRepo.update(id, {
+        corporateName: input.corporateName,
+        tradeName: input.tradeName,
+        cnpj: input.cnpj,
+        address: input.address,
+        email: input.email,
+        ...(input.password ? { passwordHash: hashPassword(input.password) } : {}),
       });
     },
 
-    async delete(id: string) {
-      const partnerCompany = await prisma.partnerCompany.findUnique({ where: { id } });
-      if (!partnerCompany) return null;
-      await prisma.user.delete({ where: { id: partnerCompany.userId } });
-      return partnerCompany;
-    }
+    delete(id: string) {
+      return partnerRepo.delete(id);
+    },
   };
 }

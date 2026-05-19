@@ -1,6 +1,5 @@
 ﻿import type { FastifyInstance } from 'fastify';
-import { createAuthService, type LoginInput, type UpdatePerfilInput, type ChangePasswordInput } from '../application/auth-service.js';
-import { PrismaUserRepository } from '../infra/prisma-user.repository.js';
+import type { LoginInput, UpdatePerfilInput, ChangePasswordInput } from '../application/auth-service.js';
 import { toAuthUserResponse } from '../responder/auth-responder.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
@@ -31,7 +30,6 @@ const tokenSchema = { type: 'object', properties: { token: { type: 'string' } } 
 type PerfilBody = { entityId: string } & UpdatePerfilInput;
 
 export async function authRoutes(app: FastifyInstance) {
-  const authService = createAuthService(new PrismaUserRepository(app.prisma));
 
   app.post<{ Body: LoginInput }>('/api/auth/login', {
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
@@ -50,7 +48,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const result = await authService.login(request.body);
+      const result = await app.authService.login(request.body);
       if (!result) return reply.status(401).send({ message: 'Email ou senha invalidos' });
       const token = app.jwt.sign({ sub: result.id, role: result.role });
       return toAuthUserResponse(result, token);
@@ -92,7 +90,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      await authService.changePassword(request.body);
+      await app.authService.changePassword(request.body);
       return { message: 'Senha alterada com sucesso' };
     } catch (error) {
       return sendErrorResponse(reply, error);
@@ -118,7 +116,7 @@ export async function authRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     try {
       const { entityId, ...data } = request.body;
-      await authService.updateAdminPerfil(entityId, data);
+      await app.authService.updateAdminPerfil(entityId, data);
       return { message: 'Perfil atualizado com sucesso' };
     } catch (error) {
       return sendErrorResponse(reply, error);

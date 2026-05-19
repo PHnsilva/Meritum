@@ -1,27 +1,27 @@
 import { DomainErrors } from '../../../shared/errors/domain-errors.js';
 import { EmailVO } from '../../../shared/domain/value-objects/email-vo.js';
 
-export type PartnerStatus = 'PENDING' | 'APPROVED';
+export type InstitutionStatus = 'PENDING' | 'APPROVED';
 
-export class PartnerEntity {
+export class InstitutionEntity {
   constructor(
     readonly id: string,
-    readonly corporateName: string,
+    readonly name: string,
     readonly email: EmailVO,
-    readonly status: PartnerStatus,
-    readonly user: { name: string; email: string }
+    readonly status: InstitutionStatus,
+    readonly user: { id: string; name: string; email: string }
   ) {}
 
-  verifyOwnership(requesterId: string, requesterRole: string): void {
-    if (requesterRole === 'partner' && this.id !== requesterId) {
+  verifyOwnership(userId: string): void {
+    if (this.user.id !== userId) {
       const err = new Error('Acesso negado: voce nao e o proprietario');
       err.name = 'OwnershipError';
       throw err;
     }
   }
 
-  canManageAdvantage(requesterRole: string): boolean {
-    return requesterRole === 'partner' || requesterRole === 'admin';
+  canQueryData(userId: string): boolean {
+    return this.user.id === userId;
   }
 
   assertApproved(): void {

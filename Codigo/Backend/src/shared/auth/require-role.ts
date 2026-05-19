@@ -1,6 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-
-type Role = 'admin' | 'student' | 'professor' | 'partner' | 'institution';
+import type { Role } from '../domain/role.js';
 
 export function requireRole(...roles: Role[]) {
   return async (request: FastifyRequest, reply: FastifyReply) => {

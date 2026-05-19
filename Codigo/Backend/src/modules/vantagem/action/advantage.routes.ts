@@ -1,9 +1,7 @@
 ﻿import type { FastifyInstance } from 'fastify';
+import type { CreateAdvantageInput, UpdateAdvantageInput } from '../application/advantage-service.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
-import { createAdvantageService, type CreateAdvantageInput, type UpdateAdvantageInput } from '../application/advantage-service.js';
-import { PrismaAdvantageRepository } from '../infra/prisma-advantage.repository.js';
-import { PrismaStudentCoinRepository } from '../infra/prisma-student-coin.repository.js';
 import { toAdvantageListResponse, toAdvantageResponse, toRedemptionResponse } from '../responder/advantage-responder.js';
 
 const advantageSchema = {
@@ -47,11 +45,6 @@ const bodySchema = {
 const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
 export async function advantageRoutes(app: FastifyInstance) {
-  const service = createAdvantageService(
-    app.prisma,
-    new PrismaAdvantageRepository(app.prisma),
-    new PrismaStudentCoinRepository(app.prisma)
-  );
 
   // All authenticated — catalog (active advantages only)
   app.get('/api/vantagens', {
@@ -62,7 +55,7 @@ export async function advantageRoutes(app: FastifyInstance) {
       response: { 200: { type: 'array', items: advantageSchema } }
     }
   }, async () => {
-    const list = await service.list();
+    const list = await app.advantageService.list();
     return toAdvantageListResponse(list);
   });
 
@@ -75,7 +68,7 @@ export async function advantageRoutes(app: FastifyInstance) {
       response: { 200: { type: 'array', items: advantageSchema } }
     }
   }, async () => {
-    return toAdvantageListResponse(await service.listAll());
+    return toAdvantageListResponse(await app.advantageService.listAll());
   });
 
   // Partner — own advantages (all statuses)
@@ -88,7 +81,7 @@ export async function advantageRoutes(app: FastifyInstance) {
     }
   }, async (request) => {
     const { sub } = request.user as { sub: string };
-    const list = await service.listByPartner(sub);
+    const list = await app.advantageService.listByPartner(sub);
     return toAdvantageListResponse(list);
   });
 
@@ -105,7 +98,7 @@ export async function advantageRoutes(app: FastifyInstance) {
     const { sub, role } = request.user as { sub: string; role: string };
     const partnerId = role === 'admin' ? request.query.partnerId : sub;
     if (!partnerId) return reply.status(400).send({ message: 'partnerId e obrigatorio para admin' });
-    const list = await service.listPartnerRedemptions(partnerId);
+    const list = await app.advantageService.listPartnerRedemptions(partnerId);
     return list.map(toRedemptionResponse);
   });
 
@@ -121,7 +114,7 @@ export async function advantageRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     try {
       const { sub, role } = request.user as { sub: string; role: string };
-      const list = await service.listRedemptionsByAdvantage(request.params.id, sub, role);
+      const list = await app.advantageService.listRedemptionsByAdvantage(request.params.id, sub, role);
       return list.map(toRedemptionResponse);
     } catch (error) {
       return sendErrorResponse(reply, error);
@@ -137,7 +130,7 @@ export async function advantageRoutes(app: FastifyInstance) {
       response: { 200: advantageSchema, 404: errorSchema }
     }
   }, async (request, reply) => {
-    const advantage = await service.findById(request.params.id);
+    const advantage = await app.advantageService.findById(request.params.id);
     if (!advantage) return reply.status(404).send({ message: 'Vantagem nao encontrada' });
     return toAdvantageResponse(advantage);
   });
@@ -152,7 +145,7 @@ export async function advantageRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     const { sub } = request.user as { sub: string };
-    const advantage = await service.create(sub, request.body);
+    const advantage = await app.advantageService.create(sub, request.body);
     return reply.status(201).send(toAdvantageResponse(advantage));
   });
 
@@ -178,7 +171,7 @@ export async function advantageRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     try {
       const { sub, role } = request.user as { sub: string; role: string };
-      const advantage = await service.update(request.params.id, sub, role, request.body);
+      const advantage = await app.advantageService.update(request.params.id, sub, role, request.body);
       return toAdvantageResponse(advantage);
     } catch (error) {
       return sendErrorResponse(reply, error);
@@ -196,7 +189,7 @@ export async function advantageRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     try {
       const { sub, role } = request.user as { sub: string; role: string };
-      await service.delete(request.params.id, sub, role);
+      await app.advantageService.delete(request.params.id, sub, role);
       return reply.status(204).send();
     } catch (error) {
       return sendErrorResponse(reply, error);
@@ -215,7 +208,7 @@ export async function advantageRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     try {
       const { sub } = request.user as { sub: string };
-      const redemption = await service.redeem(request.params.id, sub);
+      const redemption = await app.advantageService.redeem(request.params.id, sub);
       return reply.status(201).send(toRedemptionResponse(redemption));
     } catch (error) {
       return sendErrorResponse(reply, error);
@@ -239,10 +232,10 @@ export async function advantageRoutes(app: FastifyInstance) {
     if (role === 'admin') {
       const { studentId } = request.query;
       if (!studentId) return reply.status(400).send({ message: 'studentId e obrigatorio para admin' });
-      const list = await service.listRedemptionsByStudent(studentId);
+      const list = await app.advantageService.listRedemptionsByStudent(studentId);
       return list.map(toRedemptionResponse);
     }
-    const list = await service.listRedemptionsByStudent(sub);
+    const list = await app.advantageService.listRedemptionsByStudent(sub);
     return list.map(toRedemptionResponse);
   });
 }

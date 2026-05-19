@@ -1,5 +1,10 @@
-import { hashPassword, verifyPassword } from '../../../shared/security/password-hasher.js';
+import { hashPassword } from '../../../shared/security/password-hasher.js';
 import { DomainErrors } from '../../../shared/errors/domain-errors.js';
+import { EmailVO } from '../../../shared/domain/value-objects/email-vo.js';
+import { Password } from '../../../shared/domain/value-objects/password.js';
+import { UserEntity } from '../domain/user.entity.js';
+import { eventBus } from '../../../shared/domain/events/event-bus.js';
+import { UserPasswordChangedEvent } from '../../../shared/domain/events/user-password-changed-event.js';
 import type { UserRepository } from '../domain/user.repository.js';
 
 export type LoginInput = { email: string; password: string };
@@ -16,33 +21,43 @@ export type AuthUserResult = {
 };
 
 export type UpdatePerfilInput = { name?: string; email?: string };
-export type ChangePasswordInput = { email: string; newPassword: string };
+export type ChangePasswordInput = { email: string; newPassword: string; currentPassword?: string };
 
 export function createAuthService(userRepo: UserRepository) {
   return {
     async login(input: LoginInput): Promise<AuthUserResult | null> {
-      const user = await userRepo.findByEmail(input.email);
-      if (!user || !verifyPassword(input.password, user.passwordHash)) return null;
+      const userRead = await userRepo.findByEmail(input.email);
+      if (!userRead) return null;
 
-      if (user.role === 'PARTNER' && user.partnerCompany?.status === 'PENDING') {
+      const entity = new UserEntity(
+        userRead.id,
+        EmailVO.create(userRead.email),
+        userRead.role as any,
+        Password.fromHash(userRead.passwordHash),
+        userRead.mustChangePassword
+      );
+
+      if (!entity.verifyPassword(input.password)) return null;
+
+      if (userRead.role === 'PARTNER' && userRead.partnerCompany?.status === 'PENDING') {
         throw DomainErrors.accountPending();
       }
-      if (user.role === 'INSTITUTION' && user.institution?.status === 'PENDING') {
+      if (userRead.role === 'INSTITUTION' && userRead.institution?.status === 'PENDING') {
         throw DomainErrors.accountPending();
       }
 
-      const coinBalance = user.student?.coinBalance ?? user.professor?.coinBalance ?? null;
-      const entityId = user.student?.id ?? user.professor?.id ?? user.partnerCompany?.id ?? user.institution?.id ?? user.id;
+      const coinBalance = userRead.student?.coinBalance ?? userRead.professor?.coinBalance ?? null;
+      const entityId = userRead.student?.id ?? userRead.professor?.id ?? userRead.partnerCompany?.id ?? userRead.institution?.id ?? userRead.id;
 
       return {
         id: entityId,
-        name: user.name,
-        email: user.email,
-        role: user.role.toLowerCase(),
+        name: userRead.name,
+        email: userRead.email,
+        role: userRead.role.toLowerCase(),
         coinBalance,
-        mustChangePassword: user.mustChangePassword,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt
+        mustChangePassword: userRead.mustChangePassword,
+        createdAt: userRead.createdAt,
+        updatedAt: userRead.updatedAt
       };
     },
 
@@ -53,9 +68,25 @@ export function createAuthService(userRepo: UserRepository) {
     },
 
     async changePassword(input: ChangePasswordInput): Promise<void> {
-      const user = await userRepo.findByEmail(input.email);
-      if (!user) throw DomainErrors.userNotFound();
-      await userRepo.updatePassword(user.id, hashPassword(input.newPassword), false);
+      const userRead = await userRepo.findByEmail(input.email);
+      if (!userRead) throw DomainErrors.userNotFound();
+
+      const entity = new UserEntity(
+        userRead.id,
+        EmailVO.create(userRead.email),
+        userRead.role as any,
+        Password.fromHash(userRead.passwordHash),
+        userRead.mustChangePassword
+      );
+
+      if (input.currentPassword) {
+        entity.changePassword(input.newPassword, input.currentPassword);
+      } else {
+        entity.setTemporaryPassword(Password.create(input.newPassword));
+      }
+
+      await userRepo.updatePassword(entity.id, entity.passwordHash, entity.mustChangePassword);
+      eventBus.publish(new UserPasswordChangedEvent(entity.id, entity.email.value));
     }
   };
 }

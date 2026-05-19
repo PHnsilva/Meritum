@@ -1,7 +1,13 @@
 import { CPF } from '../../../shared/domain/value-objects/cpf.js';
 import { EmailVO } from '../../../shared/domain/value-objects/email-vo.js';
+import { RG } from '../../../shared/domain/value-objects/rg.js';
+import { Address } from '../../../shared/domain/value-objects/address.js';
+import { Course } from '../../../shared/domain/value-objects/course.js';
+import { StudentEntity } from '../domain/student.entity.js';
 import { hashPassword } from '../../../shared/security/password-hasher.js';
 import { paginate, toPaginatedResult } from '../../../shared/pagination/pagination.js';
+import { eventBus } from '../../../shared/domain/events/event-bus.js';
+import { AlunoCriadoEvent } from '../../../shared/domain/events/aluno-criado-event.js';
 import type { StudentRepository } from '../domain/student.repository.js';
 
 export type CreateStudentInput = {
@@ -35,15 +41,25 @@ export function createStudentService(studentRepo: StudentRepository) {
     },
 
     async create(input: CreateStudentInput) {
-      EmailVO.create(input.email);
-      CPF.create(input.cpf);
+      const cpf = CPF.create(input.cpf);
+      const email = EmailVO.create(input.email);
+      const rg = RG.create(input.rg);
+      const address = Address.create(input.address);
+      const course = Course.create(input.course);
+
       const { password, ...rest } = input;
-      return studentRepo.create({ ...rest, passwordHash: hashPassword(password) });
+      const student = await studentRepo.create({ ...rest, passwordHash: hashPassword(password) });
+      eventBus.publish(new AlunoCriadoEvent(student.id, student.user.name, student.user.email, student.institution.name));
+      return student;
     },
 
     async update(id: string, input: UpdateStudentInput) {
       if (input.email) EmailVO.create(input.email);
       if (input.cpf) CPF.create(input.cpf);
+      if (input.rg) RG.create(input.rg);
+      if (input.address) Address.create(input.address);
+      if (input.course) Course.create(input.course);
+
       const { password, ...rest } = input;
       return studentRepo.update(id, {
         ...rest,
