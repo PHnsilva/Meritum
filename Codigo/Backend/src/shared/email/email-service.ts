@@ -1,3 +1,5 @@
+import QRCode from 'qrcode';
+
 type SendCoinEmailParams = {
   studentName: string;
   studentEmail: string;
@@ -138,10 +140,11 @@ function buildStudentCouponHtml(studentName: string, advantageTitle: string, par
     <h2 style="color:#1e293b">Seu cupom de resgate</h2>
     <p>Ola, <strong>${studentName}</strong>!</p>
     <p>Voce resgatou a vantagem <strong>${advantageTitle}</strong> oferecida por <strong>${partnerName}</strong> por <strong>${coinCost} moedas</strong>.</p>
-    <p>Apresente o codigo abaixo no estabelecimento para utilizar sua vantagem:</p>
+    <p>Apresente o codigo e o QR code abaixo no estabelecimento para utilizar sua vantagem:</p>
     <div style="background:#fefce8;border-left:4px solid #ca8a04;padding:20px;margin:24px 0;border-radius:4px;text-align:center">
-      <p style="margin:0 0 8px;font-size:0.85rem;color:#78350f">CODIGO DO CUPOM</p>
-      <p style="margin:0;font-size:2rem;font-weight:700;letter-spacing:0.25em;color:#92400e">${code}</p>
+      <p style="margin:0 0 12px;font-size:0.85rem;color:#78350f">CODIGO DO CUPOM</p>
+      <p style="margin:0 0 20px;font-size:2rem;font-weight:700;letter-spacing:0.25em;color:#92400e">${code}</p>
+      <img src="cid:qrcode-student" alt="QR Code" style="width:180px;height:180px;border:2px solid #92400e;border-radius:4px" />
     </div>
     <p style="color:#64748b;font-size:14px">Guarde este email. O codigo e unico e sera verificado pelo parceiro no momento da troca.</p>
     <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
@@ -162,12 +165,13 @@ function buildPartnerRedemptionHtml(partnerName: string, studentName: string, ad
     <h2 style="color:#1e293b">Nova troca realizada</h2>
     <p>Ola, <strong>${partnerName}</strong>!</p>
     <p>O aluno <strong>${studentName}</strong> resgatou a vantagem <strong>${advantageTitle}</strong> por <strong>${coinCost} moedas</strong>.</p>
-    <p>Quando o aluno apresentar o cupom, verifique o codigo abaixo:</p>
+    <p>Quando o aluno apresentar o cupom, verifique o codigo e o QR code abaixo:</p>
     <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:20px;margin:24px 0;border-radius:4px;text-align:center">
-      <p style="margin:0 0 8px;font-size:0.85rem;color:#15803d">CODIGO DO CUPOM A VERIFICAR</p>
-      <p style="margin:0;font-size:2rem;font-weight:700;letter-spacing:0.25em;color:#166534">${code}</p>
+      <p style="margin:0 0 12px;font-size:0.85rem;color:#15803d">CODIGO DO CUPOM A VERIFICAR</p>
+      <p style="margin:0 0 20px;font-size:2rem;font-weight:700;letter-spacing:0.25em;color:#166534">${code}</p>
+      <img src="cid:qrcode-partner" alt="QR Code" style="width:180px;height:180px;border:2px solid #16a34a;border-radius:4px" />
     </div>
-    <p style="color:#64748b;font-size:14px">Confirme que o codigo apresentado pelo aluno corresponde ao codigo acima antes de realizar a troca.</p>
+    <p style="color:#64748b;font-size:14px">Confirme que o codigo apresentado pelo aluno corresponde ao codigo acima e o QR code combina antes de realizar a troca.</p>
     <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
     <p style="color:#94a3b8;font-size:12px">Sistema de Moeda Estudantil - Meritum</p>
   </div>
@@ -287,10 +291,43 @@ async function sendWithNodemailer(opts: {
 
 export async function sendStudentCouponEmail(studentEmail: string, studentName: string, advantageTitle: string, partnerName: string, coinCost: number, code: string): Promise<void> {
   try {
-    await sendWithNodemailer({
+    const qrCodeBuffer = await QRCode.toBuffer(code, {
+      width: 200,
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' }
+    });
+
+    const nodemailer = await import('nodemailer');
+    const host = process.env['SMTP_HOST'];
+    const user = process.env['SMTP_USER'];
+    const pass = process.env['SMTP_PASS'];
+    const from = process.env['SMTP_FROM'] ?? 'meritum@sistema.com';
+    const port = Number(process.env['SMTP_PORT'] ?? 587);
+
+    let transporter: any;
+    if (!host || !user || !pass) {
+      const testAccount = await nodemailer.default.createTestAccount();
+      transporter = nodemailer.default.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        auth: { user: testAccount.user, pass: testAccount.pass }
+      });
+    } else {
+      transporter = nodemailer.default.createTransport({ host, port, auth: { user, pass } });
+    }
+
+    await transporter.sendMail({
+      from,
       to: studentEmail,
       subject: `Meritum: cupom de resgate — ${advantageTitle}`,
-      html: buildStudentCouponHtml(studentName, advantageTitle, partnerName, coinCost, code)
+      html: buildStudentCouponHtml(studentName, advantageTitle, partnerName, coinCost, code),
+      attachments: [
+        {
+          filename: 'qrcode.png',
+          content: qrCodeBuffer,
+          cid: 'qrcode-student'
+        }
+      ]
     });
   } catch (err) {
     console.error('[email] Falha ao enviar cupom ao aluno:', err);
@@ -299,10 +336,43 @@ export async function sendStudentCouponEmail(studentEmail: string, studentName: 
 
 export async function sendPartnerRedemptionEmail(partnerEmail: string, partnerName: string, studentName: string, advantageTitle: string, coinCost: number, code: string): Promise<void> {
   try {
-    await sendWithNodemailer({
+    const qrCodeBuffer = await QRCode.toBuffer(code, {
+      width: 200,
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' }
+    });
+
+    const nodemailer = await import('nodemailer');
+    const host = process.env['SMTP_HOST'];
+    const user = process.env['SMTP_USER'];
+    const pass = process.env['SMTP_PASS'];
+    const from = process.env['SMTP_FROM'] ?? 'meritum@sistema.com';
+    const port = Number(process.env['SMTP_PORT'] ?? 587);
+
+    let transporter: any;
+    if (!host || !user || !pass) {
+      const testAccount = await nodemailer.default.createTestAccount();
+      transporter = nodemailer.default.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        auth: { user: testAccount.user, pass: testAccount.pass }
+      });
+    } else {
+      transporter = nodemailer.default.createTransport({ host, port, auth: { user, pass } });
+    }
+
+    await transporter.sendMail({
+      from,
       to: partnerEmail,
       subject: `Meritum: nova troca — ${advantageTitle}`,
-      html: buildPartnerRedemptionHtml(partnerName, studentName, advantageTitle, coinCost, code)
+      html: buildPartnerRedemptionHtml(partnerName, studentName, advantageTitle, coinCost, code),
+      attachments: [
+        {
+          filename: 'qrcode.png',
+          content: qrCodeBuffer,
+          cid: 'qrcode-partner'
+        }
+      ]
     });
   } catch (err) {
     console.error('[email] Falha ao notificar parceiro da troca:', err);

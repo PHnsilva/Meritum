@@ -50,6 +50,12 @@ export class UserEntity {
     this._mustChangePassword = true;
   }
 
+  changeInitialPassword(newRaw: string): void {
+    const newPassword = Password.create(newRaw);
+    (this as any).password = newPassword;
+    this._mustChangePassword = false;
+  }
+
   markPasswordAsChanged(): void {
     this._mustChangePassword = false;
   }

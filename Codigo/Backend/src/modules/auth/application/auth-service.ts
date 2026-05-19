@@ -82,7 +82,7 @@ export function createAuthService(userRepo: UserRepository) {
       if (input.currentPassword) {
         entity.changePassword(input.newPassword, input.currentPassword);
       } else {
-        entity.setTemporaryPassword(Password.create(input.newPassword));
+        entity.changeInitialPassword(input.newPassword);
       }
 
       await userRepo.updatePassword(entity.id, entity.passwordHash, entity.mustChangePassword);
