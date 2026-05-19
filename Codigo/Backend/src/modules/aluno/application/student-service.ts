@@ -40,12 +40,16 @@ export function createStudentService(studentRepo: StudentRepository) {
       return studentRepo.findById(id);
     },
 
+    findByIdWithRelations(id: string) {
+      return studentRepo.findByIdWithRelations(id);
+    },
+
     async create(input: CreateStudentInput) {
-      const cpf = CPF.create(input.cpf);
-      const email = EmailVO.create(input.email);
-      const rg = RG.create(input.rg);
-      const address = Address.create(input.address);
-      const course = Course.create(input.course);
+      CPF.create(input.cpf);
+      EmailVO.create(input.email);
+      RG.create(input.rg);
+      Address.create(input.address);
+      Course.create(input.course);
 
       const { password, ...rest } = input;
       const student = await studentRepo.create({ ...rest, passwordHash: hashPassword(password) });
@@ -54,11 +58,16 @@ export function createStudentService(studentRepo: StudentRepository) {
     },
 
     async update(id: string, input: UpdateStudentInput) {
+      // Validate inputs (domain logic)
       if (input.email) EmailVO.create(input.email);
       if (input.cpf) CPF.create(input.cpf);
       if (input.rg) RG.create(input.rg);
       if (input.address) Address.create(input.address);
       if (input.course) Course.create(input.course);
+
+      // Load entity to ensure it exists and can be updated
+      const student = await studentRepo.findById(id);
+      if (!student) return null;
 
       const { password, ...rest } = input;
       return studentRepo.update(id, {

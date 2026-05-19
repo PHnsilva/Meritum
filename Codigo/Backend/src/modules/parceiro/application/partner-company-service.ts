@@ -72,6 +72,10 @@ export function createPartnerCompanyService(partnerRepo: PartnerRepository) {
     },
 
     async update(id: string, input: UpdatePartnerCompanyInput) {
+      // Ensure entity exists before updating (domain logic)
+      const partner = await partnerRepo.findById(id);
+      if (!partner) throw DomainErrors.partnerNotFound();
+
       if (input.email) EmailVO.create(input.email);
       return partnerRepo.update(id, {
         corporateName: input.corporateName,
@@ -83,7 +87,10 @@ export function createPartnerCompanyService(partnerRepo: PartnerRepository) {
       });
     },
 
-    delete(id: string) {
+    async delete(id: string) {
+      // Ensure entity exists before deleting (domain logic)
+      const partner = await partnerRepo.findById(id);
+      if (!partner) throw DomainErrors.partnerNotFound();
       return partnerRepo.delete(id);
     },
   };

@@ -36,10 +36,14 @@ export interface PartnerRepository {
   findById(id: string): Promise<PartnerEntity | null>;
   /** Full read model with user data — for API responses. */
   findByIdFull(id: string): Promise<PartnerReadModel | null>;
+
+  // DTO-returning (for API responses)
   list(filter?: { status?: 'PENDING' | 'APPROVED' }, skip?: number, take?: number): Promise<PartnerReadModel[]>;
   count(filter?: { status?: 'PENDING' | 'APPROVED' }): Promise<number>;
-  create(data: CreatePartnerData): Promise<PartnerReadModel>;
-  approve(id: string): Promise<PartnerReadModel>;
-  update(id: string, data: UpdatePartnerData): Promise<PartnerReadModel | null>;
-  delete(id: string): Promise<PartnerReadModel | null>;
+
+  // Commands (return Entity for domain logic)
+  create(data: CreatePartnerData): Promise<PartnerEntity>;
+  approve(id: string): Promise<PartnerEntity>;
+  update(id: string, data: UpdatePartnerData): Promise<PartnerEntity | null>;
+  delete(id: string): Promise<PartnerEntity | null>;
 }

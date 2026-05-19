@@ -59,11 +59,15 @@ export function createInstitutionService(
     },
 
     async update(id: string, input: UpdateInstitutionInput) {
+      // Ensure entity exists before updating (domain logic)
+      const institution = await institutionRepo.findById(id);
+      if (!institution) throw DomainErrors.institutionNotFound();
+
       const data: { name?: string; email?: string; passwordHash?: string } = {};
       if (input.name?.trim()) data.name = input.name.trim();
       if (input.email) { EmailVO.create(input.email); data.email = input.email; }
       if (input.password) data.passwordHash = hashPassword(input.password);
-      if (Object.keys(data).length === 0) return institutionRepo.findById(id);
+      if (Object.keys(data).length === 0) return institution;
       return institutionRepo.updateWithUser(id, data);
     },
 

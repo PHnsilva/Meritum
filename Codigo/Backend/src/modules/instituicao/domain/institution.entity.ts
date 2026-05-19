@@ -13,11 +13,7 @@ export class InstitutionEntity {
   ) {}
 
   verifyOwnership(userId: string): void {
-    if (this.user.id !== userId) {
-      const err = new Error('Acesso negado: voce nao e o proprietario');
-      err.name = 'OwnershipError';
-      throw err;
-    }
+    if (this.user.id !== userId) throw DomainErrors.ownershipError();
   }
 
   canQueryData(userId: string): boolean {

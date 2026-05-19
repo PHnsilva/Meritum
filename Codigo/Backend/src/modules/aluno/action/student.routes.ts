@@ -111,7 +111,7 @@ export async function studentRoutes(app: FastifyInstance) {
       response: { 200: studentResponseSchema, 404: errorSchema }
     }
   }, async (request, reply) => {
-    const student = await app.studentService.findById(request.params.id);
+    const student = await app.studentService.findByIdWithRelations(request.params.id);
     if (!student) return reply.status(404).send({ message: 'Aluno nao encontrado' });
     return toStudentResponse(student);
   });
@@ -126,8 +126,9 @@ export async function studentRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const student = await app.studentService.create(request.body);
-      return reply.status(201).send(toStudentResponse(student));
+      const created = await app.studentService.create(request.body);
+      const student = await app.studentService.findByIdWithRelations(created.id);
+      return reply.status(201).send(toStudentResponse(student!));
     } catch (error) {
       return sendErrorResponse(reply, error, 'Aluno ja cadastrado com email, CPF ou RG informado');
     }
@@ -144,9 +145,10 @@ export async function studentRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const student = await app.studentService.update(request.params.id, request.body);
-      if (!student) return reply.status(404).send({ message: 'Aluno nao encontrado' });
-      return toStudentResponse(student);
+      const updated = await app.studentService.update(request.params.id, request.body);
+      if (!updated) return reply.status(404).send({ message: 'Aluno nao encontrado' });
+      const student = await app.studentService.findByIdWithRelations(updated.id);
+      return toStudentResponse(student!);
     } catch (error) {
       return sendErrorResponse(reply, error, 'Aluno ja cadastrado com email, CPF ou RG informado');
     }

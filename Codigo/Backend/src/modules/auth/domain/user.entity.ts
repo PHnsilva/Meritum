@@ -40,19 +40,17 @@ export class UserEntity {
       throw err;
     }
 
-    const newPassword = Password.create(newRaw);
-    (this as any).password = newPassword;
+    Object.assign(this, { password: Password.create(newRaw) });
     this._mustChangePassword = false;
   }
 
   setTemporaryPassword(tempPassword: Password): void {
-    (this as any).password = tempPassword;
+    Object.assign(this, { password: tempPassword });
     this._mustChangePassword = true;
   }
 
   changeInitialPassword(newRaw: string): void {
-    const newPassword = Password.create(newRaw);
-    (this as any).password = newPassword;
+    Object.assign(this, { password: Password.create(newRaw) });
     this._mustChangePassword = false;
   }
 

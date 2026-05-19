@@ -28,6 +28,16 @@ function toReadModel(row: PartnerRow): PartnerReadModel {
   };
 }
 
+function toEntity(row: PartnerRow): PartnerEntity {
+  return new PartnerEntity(
+    row.id,
+    row.corporateName,
+    EmailVO.create(row.user.email),
+    row.status as PartnerStatus,
+    { name: row.user.name, email: row.user.email }
+  );
+}
+
 const include = { user: true } as const;
 
 export class PrismaPartnerRepository implements PartnerRepository {
@@ -71,8 +81,8 @@ export class PrismaPartnerRepository implements PartnerRepository {
     });
   }
 
-  async create(data: CreatePartnerData): Promise<PartnerReadModel> {
-    return this.prisma.$transaction(async (tx) => {
+  async create(data: CreatePartnerData): Promise<PartnerEntity> {
+    const row = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           name: data.corporateName,
@@ -81,7 +91,7 @@ export class PrismaPartnerRepository implements PartnerRepository {
           role: 'PARTNER',
         },
       });
-      const row = await tx.partnerCompany.create({
+      return tx.partnerCompany.create({
         data: {
           userId: user.id,
           corporateName: data.corporateName,
@@ -92,24 +102,24 @@ export class PrismaPartnerRepository implements PartnerRepository {
         },
         include,
       });
-      return toReadModel(row as PartnerRow);
     });
+    return toEntity(row as PartnerRow);
   }
 
-  async approve(id: string): Promise<PartnerReadModel> {
+  async approve(id: string): Promise<PartnerEntity> {
     const row = await this.prisma.partnerCompany.update({
       where: { id },
       data: { status: 'APPROVED' },
       include,
     });
-    return toReadModel(row as PartnerRow);
+    return toEntity(row as PartnerRow);
   }
 
-  async update(id: string, data: UpdatePartnerData): Promise<PartnerReadModel | null> {
+  async update(id: string, data: UpdatePartnerData): Promise<PartnerEntity | null> {
     const existing = await this.prisma.partnerCompany.findUnique({ where: { id }, include });
     if (!existing) return null;
 
-    return this.prisma.$transaction(async (tx) => {
+    const row = await this.prisma.$transaction(async (tx) => {
       if (data.corporateName || data.email || data.passwordHash) {
         await tx.user.update({
           where: { id: existing.userId },
@@ -120,7 +130,7 @@ export class PrismaPartnerRepository implements PartnerRepository {
           },
         });
       }
-      const row = await tx.partnerCompany.update({
+      return tx.partnerCompany.update({
         where: { id },
         data: {
           ...(data.corporateName ? { corporateName: data.corporateName } : {}),
@@ -130,14 +140,14 @@ export class PrismaPartnerRepository implements PartnerRepository {
         },
         include,
       });
-      return toReadModel(row as PartnerRow);
     });
+    return toEntity(row as PartnerRow);
   }
 
-  async delete(id: string): Promise<PartnerReadModel | null> {
+  async delete(id: string): Promise<PartnerEntity | null> {
     const existing = await this.prisma.partnerCompany.findUnique({ where: { id }, include });
     if (!existing) return null;
     await this.prisma.user.delete({ where: { id: existing.userId } });
-    return toReadModel(existing as PartnerRow);
+    return toEntity(existing as PartnerRow);
   }
 }

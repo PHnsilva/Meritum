@@ -1,8 +1,20 @@
 import type { PrismaClient } from '@prisma/client';
+import { InstitutionEntity } from '../domain/institution.entity.js';
+import { EmailVO } from '../../../shared/domain/value-objects/email-vo.js';
 import type { InstitutionData, InstitutionRepository, RegisterInstitutionData } from '../domain/institution.repository.js';
 
 export class PrismaInstitutionRepository implements InstitutionRepository {
   constructor(private readonly prisma: PrismaClient) {}
+
+  private toEntity(raw: any): InstitutionEntity {
+    return new InstitutionEntity(
+      raw.id,
+      raw.name,
+      EmailVO.create(raw.user?.email || ''),
+      raw.status,
+      { id: raw.user?.id || '', name: raw.user?.name || '', email: raw.user?.email || '' }
+    );
+  }
 
   findAll(status?: 'PENDING' | 'APPROVED'): Promise<InstitutionData[]> {
     return this.prisma.institution.findMany({
@@ -11,56 +23,77 @@ export class PrismaInstitutionRepository implements InstitutionRepository {
     });
   }
 
-  async findById(id: string): Promise<InstitutionData | null> {
+  async findById(id: string): Promise<InstitutionEntity | null> {
     const inst = await this.prisma.institution.findUnique({
       where: { id },
       include: { user: true }
     });
-    if (!inst) return null;
-    return { ...inst, userEmail: inst.user?.email ?? undefined, userName: inst.user?.name ?? undefined };
+    return inst ? this.toEntity(inst) : null;
   }
 
-  findByUserId(userId: string): Promise<InstitutionData | null> {
-    return this.prisma.institution.findFirst({ where: { userId } });
+  findByIdWithRelations(id: string): Promise<InstitutionData | null> {
+    return this.prisma.institution.findUnique({
+      where: { id },
+      include: { user: true }
+    }) as Promise<InstitutionData | null>;
   }
 
-  async create(name: string): Promise<InstitutionData> {
-    return this.prisma.institution.create({ data: { name: name.trim(), status: 'APPROVED' } });
+  async findByUserId(userId: string): Promise<InstitutionEntity | null> {
+    const inst = await this.prisma.institution.findFirst({
+      where: { userId },
+      include: { user: true }
+    });
+    return inst ? this.toEntity(inst) : null;
   }
 
-  async register(data: RegisterInstitutionData): Promise<{ institution: InstitutionData; userEmail: string }> {
+  async create(name: string): Promise<InstitutionEntity> {
+    const raw = await this.prisma.institution.create({
+      data: { name: name.trim(), status: 'APPROVED' },
+      include: { user: true }
+    });
+    return this.toEntity(raw);
+  }
+
+  async register(data: RegisterInstitutionData): Promise<{ institution: InstitutionEntity; userEmail: string }> {
     const result = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: { name: data.name, email: data.email, passwordHash: data.passwordHash, role: 'INSTITUTION' }
       });
       const institution = await tx.institution.create({
-        data: { name: data.name.trim(), userId: user.id, status: 'PENDING' }
+        data: { name: data.name.trim(), userId: user.id, status: 'PENDING' },
+        include: { user: true }
       });
       return { institution, userEmail: user.email };
     });
-    return result;
+    return { institution: this.toEntity(result.institution), userEmail: result.userEmail };
   }
 
-  async approve(id: string): Promise<{ institution: InstitutionData; userEmail: string; userName: string } | null> {
+  async approve(id: string): Promise<{ institution: InstitutionEntity; userEmail: string; userName: string } | null> {
     const existing = await this.prisma.institution.findUnique({ where: { id }, include: { user: true } });
     if (!existing || !existing.user) return null;
-    const institution = await this.prisma.institution.update({
+    const inst = await this.prisma.institution.update({
       where: { id },
-      data: { status: 'APPROVED' }
+      data: { status: 'APPROVED' },
+      include: { user: true }
     });
-    return { institution, userEmail: existing.user.email, userName: existing.user.name };
+    return { institution: this.toEntity(inst), userEmail: existing.user.email, userName: existing.user.name };
   }
 
-  async update(id: string, name: string): Promise<InstitutionData | null> {
+  async update(id: string, name: string): Promise<InstitutionEntity | null> {
     const existing = await this.prisma.institution.findUnique({ where: { id } });
     if (!existing) return null;
-    return this.prisma.institution.update({ where: { id }, data: { name: name.trim() } });
+    const updated = await this.prisma.institution.update({
+      where: { id },
+      data: { name: name.trim() },
+      include: { user: true }
+    });
+    return this.toEntity(updated);
   }
 
-  async updateWithUser(id: string, data: { name?: string; email?: string; passwordHash?: string }): Promise<InstitutionData | null> {
+  async updateWithUser(id: string, data: { name?: string; email?: string; passwordHash?: string }): Promise<InstitutionEntity | null> {
     const existing = await this.prisma.institution.findUnique({ where: { id }, include: { user: true } });
     if (!existing) return null;
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       if ((data.email || data.passwordHash) && existing.userId) {
         await tx.user.update({
           where: { id: existing.userId },
@@ -70,14 +103,14 @@ export class PrismaInstitutionRepository implements InstitutionRepository {
           }
         });
       }
-      if (data.name) {
-        return tx.institution.update({ where: { id }, data: { name: data.name.trim() } });
-      }
-      // Fetch fresh data so caller sees the updated user fields, not the pre-update snapshot.
-      const fresh = await tx.institution.findUnique({ where: { id }, include: { user: true } });
-      if (!fresh) return null;
-      return { ...fresh, userEmail: fresh.user?.email ?? undefined, userName: fresh.user?.name ?? undefined };
+      const inst = await tx.institution.update({
+        where: { id },
+        data: data.name ? { name: data.name.trim() } : {},
+        include: { user: true }
+      });
+      return inst;
     });
+    return this.toEntity(updated);
   }
 
   async updateLinkedUser(institutionId: string, data: { name?: string; email?: string }): Promise<void> {
@@ -89,9 +122,8 @@ export class PrismaInstitutionRepository implements InstitutionRepository {
     });
   }
 
-
-  async delete(id: string): Promise<InstitutionData | null> {
-    const existing = await this.prisma.institution.findUnique({ where: { id } });
+  async delete(id: string): Promise<InstitutionEntity | null> {
+    const existing = await this.prisma.institution.findUnique({ where: { id }, include: { user: true } });
     if (!existing) return null;
 
     await this.prisma.$transaction(async (tx) => {
@@ -136,6 +168,6 @@ export class PrismaInstitutionRepository implements InstitutionRepository {
       if (existing.userId) await tx.user.delete({ where: { id: existing.userId } });
     });
 
-    return existing;
+    return this.toEntity(existing);
   }
 }

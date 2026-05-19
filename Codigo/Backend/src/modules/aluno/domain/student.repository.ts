@@ -1,3 +1,5 @@
+import { StudentEntity } from './student.entity.js';
+
 export type StudentReadModel = {
   id: string;
   rg: string;
@@ -33,10 +35,16 @@ export type StudentUpdateData = Partial<{
 }>;
 
 export interface StudentRepository {
+  // Entity-returning (domain logic)
+  findById(id: string): Promise<StudentEntity | null>;
+
+  // DTO-returning (for API responses)
   list(institutionId?: string, skip?: number, take?: number): Promise<StudentReadModel[]>;
   count(institutionId?: string): Promise<number>;
-  findById(id: string): Promise<StudentReadModel | null>;
-  create(data: StudentCreateData): Promise<StudentReadModel>;
-  update(id: string, data: StudentUpdateData): Promise<StudentReadModel | null>;
-  delete(id: string): Promise<StudentReadModel | null>;
+  findByIdWithRelations(id: string): Promise<StudentReadModel | null>;
+
+  // Commands
+  create(data: StudentCreateData): Promise<StudentEntity>;
+  update(id: string, data: StudentUpdateData): Promise<StudentEntity | null>;
+  delete(id: string): Promise<StudentEntity | null>;
 }

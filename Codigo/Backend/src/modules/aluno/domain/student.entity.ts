@@ -17,6 +17,7 @@ export class StudentEntity {
     readonly address: Address,
     readonly course: Course,
     readonly user: { name: string; email: string },
+    readonly institution: { id: string; name: string },
     coinBalance: number
   ) {
     this._coinBalance = coinBalance;
@@ -49,7 +50,7 @@ export class StudentEntity {
   }
 
   updateProfile(data: { address?: Address; rg?: RG }): void {
-    if (data.address) (this as any).address = data.address;
-    if (data.rg) (this as any).rg = data.rg;
+    if (data.address) Object.assign(this, { address: data.address });
+    if (data.rg) Object.assign(this, { rg: data.rg });
   }
 }
