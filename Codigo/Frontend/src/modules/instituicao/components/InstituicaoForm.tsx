@@ -6,32 +6,26 @@ import { TextField } from '../../../shared/components/TextField';
 import type { CreateInstituicaoInput } from '../types/instituicao';
 
 type InstituicaoFormProps = {
-  initialValue?: CreateInstituicaoInput;
+  initialValue?: Partial<CreateInstituicaoInput>;
   submitLabel: string;
   onSubmit: (input: CreateInstituicaoInput) => Promise<void>;
 };
 
 export function InstituicaoForm({ initialValue, submitLabel, onSubmit }: InstituicaoFormProps) {
-  const [form, setForm] = useState<CreateInstituicaoInput>({
-    name: initialValue?.name ?? ''
-  });
+  const [name, setName] = useState(initialValue?.name ?? '');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
-
-    if (form.name.trim().length < 2) {
+    if (name.trim().length < 2) {
       setError('Informe um nome com pelo menos 2 caracteres');
       return;
     }
-
     try {
       setLoading(true);
-      await onSubmit({
-        name: form.name.trim()
-      });
+      await onSubmit({ name: name.trim() });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Nao foi possivel salvar a instituicao');
     } finally {
@@ -44,8 +38,8 @@ export function InstituicaoForm({ initialValue, submitLabel, onSubmit }: Institu
       {error ? <Alert tone="error">{error}</Alert> : null}
       <TextField
         label="Nome da instituicao"
-        value={form.name}
-        onChange={(event) => setForm({ name: event.target.value })}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
         placeholder="PUC Minas - Campus Lourdes"
         required
       />

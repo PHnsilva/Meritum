@@ -18,8 +18,6 @@ const navByRole: Record<UserRole, NavItem[]> = {
     { to: '/professores', label: 'Professores', icon: BookOpen },
     { to: '/parceiros', label: 'Parceiros', icon: Building2 },
     { to: '/moedas', label: 'Enviar Moedas', icon: Coins },
-    { to: '/moedas/extrato/professor', label: 'Extrato Prof.', icon: FileText },
-    { to: '/moedas/extrato/aluno', label: 'Extrato Aluno', icon: FileText },
     { to: '/vantagens', label: 'Vantagens', icon: Gift },
     perfilItem
   ],
@@ -38,6 +36,13 @@ const navByRole: Record<UserRole, NavItem[]> = {
   partner: [
     { to: '/', label: 'Painel', icon: LayoutDashboard },
     { to: '/vantagens', label: 'Vantagens', icon: Gift },
+    perfilItem
+  ],
+  institution: [
+    { to: '/', label: 'Painel', icon: LayoutDashboard },
+    { to: '/alunos', label: 'Alunos', icon: GraduationCap },
+    { to: '/professores', label: 'Professores', icon: BookOpen },
+    { to: '/instituicao/transacoes', label: 'Transacoes', icon: Coins },
     perfilItem
   ]
 };

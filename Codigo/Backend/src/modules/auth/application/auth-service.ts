@@ -1,6 +1,6 @@
-import type { PrismaClient } from '@prisma/client';
-import { generateTempPassword, hashPassword, verifyPassword } from '../../../shared/security/password-hasher.js';
+import { hashPassword, verifyPassword } from '../../../shared/security/password-hasher.js';
 import { DomainErrors } from '../../../shared/errors/domain-errors.js';
+import type { UserRepository } from '../domain/user.repository.js';
 
 export type LoginInput = { email: string; password: string };
 
@@ -17,24 +17,22 @@ export type AuthUserResult = {
 
 export type UpdatePerfilInput = { name?: string; email?: string };
 export type ChangePasswordInput = { email: string; newPassword: string };
-export type ActivationResult = { tempPassword: string; userName: string; userEmail: string };
 
-export function createAuthService(prisma: PrismaClient) {
+export function createAuthService(userRepo: UserRepository) {
   return {
     async login(input: LoginInput): Promise<AuthUserResult | null> {
-      const user = await prisma.user.findUnique({
-        where: { email: input.email },
-        include: { student: true, professor: true, partnerCompany: true }
-      });
-
+      const user = await userRepo.findByEmail(input.email);
       if (!user || !verifyPassword(input.password, user.passwordHash)) return null;
 
       if (user.role === 'PARTNER' && user.partnerCompany?.status === 'PENDING') {
         throw DomainErrors.accountPending();
       }
+      if (user.role === 'INSTITUTION' && user.institution?.status === 'PENDING') {
+        throw DomainErrors.accountPending();
+      }
 
       const coinBalance = user.student?.coinBalance ?? user.professor?.coinBalance ?? null;
-      const entityId = user.student?.id ?? user.professor?.id ?? user.partnerCompany?.id ?? user.id;
+      const entityId = user.student?.id ?? user.professor?.id ?? user.partnerCompany?.id ?? user.institution?.id ?? user.id;
 
       return {
         id: entityId,
@@ -49,39 +47,15 @@ export function createAuthService(prisma: PrismaClient) {
     },
 
     async updateAdminPerfil(entityId: string, data: UpdatePerfilInput): Promise<void> {
-      const user = await prisma.user.findUnique({ where: { id: entityId } });
+      const user = await userRepo.findById(entityId);
       if (!user) throw DomainErrors.userNotFound();
-
-      await prisma.user.update({
-        where: { id: entityId },
-        data: {
-          ...(data.name ? { name: data.name } : {}),
-          ...(data.email ? { email: data.email } : {})
-        }
-      });
+      await userRepo.updateProfile(entityId, data);
     },
 
     async changePassword(input: ChangePasswordInput): Promise<void> {
-      const user = await prisma.user.findUnique({ where: { email: input.email } });
+      const user = await userRepo.findByEmail(input.email);
       if (!user) throw DomainErrors.userNotFound();
-
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { passwordHash: hashPassword(input.newPassword), mustChangePassword: false }
-      });
-    },
-
-    async requestActivation(email: string): Promise<ActivationResult | null> {
-      const user = await prisma.user.findUnique({ where: { email } });
-      if (!user || user.role !== 'PROFESSOR') return null;
-
-      const tempPassword = generateTempPassword();
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { passwordHash: hashPassword(tempPassword), mustChangePassword: true }
-      });
-
-      return { tempPassword, userName: user.name, userEmail: user.email };
+      await userRepo.updatePassword(user.id, hashPassword(input.newPassword), false);
     }
   };
 }

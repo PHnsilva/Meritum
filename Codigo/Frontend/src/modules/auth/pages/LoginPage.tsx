@@ -1,4 +1,4 @@
-import { LogIn, School, UserPlus, KeyRound, Building2 } from 'lucide-react';
+import { LogIn, School, UserPlus, KeyRound, Building2, Landmark } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Alert } from '../../../shared/components/Alert';
@@ -58,7 +58,7 @@ export function LoginPage() {
         <div className="login-card__header">
           <p className="eyebrow">Acesso</p>
           <h1>Entrar no sistema</h1>
-          <span>Aluno, professor ou empresa parceira — use seu email e senha.</span>
+          <span>Aluno, professor, parceiro ou instituicao — use seu email e senha.</span>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
@@ -82,6 +82,10 @@ export function LoginPage() {
           <Link to="/cadastro-parceiro" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.875rem' }}>
             <Building2 size={14} />
             Quer se tornar parceiro?
+          </Link>
+          <Link to="/cadastro-instituicao" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.875rem' }}>
+            <Landmark size={14} />
+            Solicitar cadastro de instituicao
           </Link>
         </div>
       </section>

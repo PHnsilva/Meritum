@@ -16,8 +16,13 @@ declare module 'fastify' {
 }
 
 export const jwtPlugin = fp(async (app: FastifyInstance) => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret && process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET env var is required in production');
+  }
+
   await app.register(jwt, {
-    secret: process.env.JWT_SECRET ?? 'meritum-dev-secret-key-change-in-prod',
+    secret: secret ?? 'meritum-dev-secret-key-change-in-prod',
     sign: { expiresIn: '8h' }
   });
 

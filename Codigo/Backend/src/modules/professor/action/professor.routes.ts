@@ -2,6 +2,7 @@
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
 import { createProfessorService, type CreateProfessorInput, type UpdateProfessorInput } from '../application/professor-service.js';
+import { PrismaProfessorRepository } from '../infra/prisma-professor.repository.js';
 import { toProfessorListResponse, toProfessorResponse } from '../responder/professor-responder.js';
 
 const professorResponseSchema = {
@@ -57,10 +58,10 @@ const paginatedProfessorSchema = {
 } as const;
 
 export async function professorRoutes(app: FastifyInstance) {
-  const service = createProfessorService(app.prisma);
+  const service = createProfessorService(new PrismaProfessorRepository(app.prisma));
 
-  app.get<{ Querystring: { page?: number; limit?: number } }>('/api/professores', {
-    preHandler: [app.authenticate, requireRole('admin')],
+  app.get<{ Querystring: { page?: number; limit?: number; institutionId?: string } }>('/api/professores', {
+    preHandler: [app.authenticate, requireRole('admin', 'institution')],
     schema: {
       tags: ['Professores'],
       summary: 'Lista professores cadastrados (paginado)',
@@ -68,14 +69,15 @@ export async function professorRoutes(app: FastifyInstance) {
         type: 'object',
         properties: {
           page: { type: 'integer', minimum: 1, default: 1 },
-          limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 }
+          limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 },
+          institutionId: { type: 'string', format: 'uuid' }
         }
       },
       response: { 200: paginatedProfessorSchema }
     }
   }, async (request) => {
-    const { page = 1, limit = 50 } = request.query;
-    const result = await service.list(page, limit);
+    const { page = 1, limit = 50, institutionId } = request.query;
+    const result = await service.list(page, limit, institutionId);
     return { ...result, data: toProfessorListResponse(result.data) };
   });
 

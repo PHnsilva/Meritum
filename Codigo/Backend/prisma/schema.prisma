@@ -12,6 +12,7 @@ enum Role {
   STUDENT
   PROFESSOR
   PARTNER
+  INSTITUTION
 
   @@map("role")
 }
@@ -29,15 +30,19 @@ model User {
   student        Student?
   professor      Professor?
   partnerCompany PartnerCompany?
+  institution    Institution?
 
   @@map("users")
 }
 
 model Institution {
-  id         String      @id @default(uuid())
-  name       String      @unique
-  createdAt  DateTime    @default(now()) @map("created_at")
-  updatedAt  DateTime    @updatedAt @map("updated_at")
+  id         String            @id @default(uuid())
+  userId     String?           @unique @map("user_id")
+  user       User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name       String            @unique
+  status     InstitutionStatus @default(APPROVED) @map("status")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
   students   Student[]
   professors Professor[]
 
@@ -82,6 +87,13 @@ enum PartnerStatus {
   APPROVED
 
   @@map("partner_status")
+}
+
+enum InstitutionStatus {
+  PENDING
+  APPROVED
+
+  @@map("institution_status")
 }
 
 model PartnerCompany {

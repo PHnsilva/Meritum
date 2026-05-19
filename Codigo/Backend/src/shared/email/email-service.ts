@@ -175,6 +175,52 @@ function buildPartnerRedemptionHtml(partnerName: string, studentName: string, ad
 </html>`;
 }
 
+function buildInstitutionRegistrationHtml(name: string): string {
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><title>Meritum - Cadastro Recebido</title></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;padding:32px">
+    <h1 style="color:#2563eb;margin-top:0">Meritum</h1>
+    <h2 style="color:#1e293b">Solicitacao recebida!</h2>
+    <p>Ola, <strong>${name}</strong>!</p>
+    <p>Recebemos a solicitacao de cadastro da sua instituicao no sistema Meritum.</p>
+    <p>Nossa equipe ira analisar e, apos a aprovacao, voce recebera um novo email confirmando o acesso.</p>
+    <p style="color:#64748b;font-size:14px">Caso nao tenha feito esta solicitacao, ignore este email.</p>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
+    <p style="color:#94a3b8;font-size:12px">Sistema de Moeda Estudantil - Meritum</p>
+  </div>
+</body>
+</html>`;
+}
+
+function buildInstitutionApprovalHtml(name: string): string {
+  const frontendUrl = process.env['FRONTEND_URL'] ?? 'http://localhost:5173';
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><title>Meritum - Conta Aprovada</title></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;padding:32px">
+    <h1 style="color:#2563eb;margin-top:0">Meritum</h1>
+    <h2 style="color:#1e293b">Sua conta foi aprovada!</h2>
+    <p>Ola, <strong>${name}</strong>!</p>
+    <p>A solicitacao de cadastro da sua instituicao no sistema Meritum foi <strong>aprovada</strong>.</p>
+    <p>Voce ja pode acessar o sistema com o email e senha informados no cadastro.</p>
+    <div style="text-align:center;margin:32px 0">
+      <a href="${frontendUrl}/login" style="background:#2563eb;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">
+        Acessar o sistema
+      </a>
+    </div>
+    <p style="color:#64748b;font-size:14px">Se voce nao se cadastrou, ignore este email.</p>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
+    <p style="color:#94a3b8;font-size:12px">Sistema de Moeda Estudantil - Meritum</p>
+  </div>
+</body>
+</html>`;
+}
+
 async function sendWithNodemailer(opts: {
   to: string;
   subject: string;
@@ -277,6 +323,30 @@ export async function sendPartnerApprovalEmail(partnerEmail: string, partnerName
     });
   } catch (err) {
     console.error('[email] Falha ao notificar aprovacao de parceiro:', err);
+  }
+}
+
+export async function sendInstitutionRegistrationEmail(email: string, name: string): Promise<void> {
+  try {
+    await sendWithNodemailer({
+      to: email,
+      subject: 'Meritum: solicitacao de cadastro recebida',
+      html: buildInstitutionRegistrationHtml(name)
+    });
+  } catch (err) {
+    console.error('[email] Falha ao confirmar registro de instituicao:', err);
+  }
+}
+
+export async function sendInstitutionApprovalEmail(email: string, name: string): Promise<void> {
+  try {
+    await sendWithNodemailer({
+      to: email,
+      subject: 'Meritum: sua conta de instituicao foi aprovada',
+      html: buildInstitutionApprovalHtml(name)
+    });
+  } catch (err) {
+    console.error('[email] Falha ao notificar aprovacao de instituicao:', err);
   }
 }
 

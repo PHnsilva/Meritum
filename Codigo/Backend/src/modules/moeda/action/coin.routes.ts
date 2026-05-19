@@ -1,6 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
+import { createUnitOfWork } from '../../../shared/infra/unit-of-work.js';
+import { PrismaProfessorBalanceRepository } from '../infra/prisma-professor-balance.repository.js';
+import { PrismaStudentBalanceRepository } from '../infra/prisma-student-balance.repository.js';
+import { PrismaTransactionRepository } from '../infra/prisma-transaction.repository.js';
 import { createCoinService, type EnviarMoedasInput } from '../application/coin-service.js';
 import { toExtratoResponse, toTransactionResponse } from '../responder/coin-responder.js';
 
@@ -45,7 +49,12 @@ const extratoSchema = {
 const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
 export async function coinRoutes(app: FastifyInstance) {
-  const service = createCoinService(app.prisma);
+  const service = createCoinService(
+    new PrismaProfessorBalanceRepository(app.prisma),
+    new PrismaStudentBalanceRepository(app.prisma),
+    new PrismaTransactionRepository(app.prisma),
+    createUnitOfWork(app.prisma)
+  );
 
   app.post<{ Body: Omit<EnviarMoedasInput, 'professorId'> }>('/api/moedas/enviar', {
     preHandler: [app.authenticate, requireRole('professor')],

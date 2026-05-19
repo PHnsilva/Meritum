@@ -1,69 +1,74 @@
-import type { PrismaClient } from '@prisma/client';
+import { hashPassword } from '../../../shared/security/password-hasher.js';
+import { EmailVO } from '../../../shared/domain/value-objects/email-vo.js';
 import { DomainErrors } from '../../../shared/errors/domain-errors.js';
+import { sendInstitutionRegistrationEmail, sendInstitutionApprovalEmail } from '../../../shared/email/email-service.js';
+import type { InstitutionRepository } from '../domain/institution.repository.js';
 
-export type CreateInstitutionInput = {
-  name: string;
-};
+export type CreateInstitutionInput = { name: string };
+export type RegisterInstitutionInput = { name: string; email: string; password: string };
+export type UpdateInstitutionInput = Partial<{ name: string; email: string; password: string }>;
 
-export type UpdateInstitutionInput = Partial<CreateInstitutionInput>;
-
-export function createInstitutionService(prisma: PrismaClient) {
+export function createInstitutionService(institutionRepo: InstitutionRepository) {
   return {
-    list() {
-      return prisma.institution.findMany({
-        orderBy: { name: 'asc' }
-      });
+    list(status?: 'PENDING' | 'APPROVED') {
+      return institutionRepo.findAll(status);
     },
 
     findById(id: string) {
-      return prisma.institution.findUnique({ where: { id } });
+      return institutionRepo.findById(id);
+    },
+
+    findByUserId(userId: string) {
+      return institutionRepo.findByUserId(userId);
     },
 
     async findByIdOrThrow(id: string) {
-      const institution = await prisma.institution.findUnique({ where: { id } });
+      const institution = await institutionRepo.findById(id);
       if (!institution) throw DomainErrors.institutionNotFound();
       return institution;
     },
 
     create(input: CreateInstitutionInput) {
-      return prisma.institution.create({
-        data: {
-          name: input.name.trim()
-        }
+      return institutionRepo.create(input.name);
+    },
+
+    async register(input: RegisterInstitutionInput) {
+      EmailVO.create(input.email);
+      const result = await institutionRepo.register({
+        name: input.name,
+        email: input.email,
+        passwordHash: hashPassword(input.password)
       });
+      void sendInstitutionRegistrationEmail(result.userEmail, input.name);
+      return result.institution;
+    },
+
+    async approve(id: string) {
+      const result = await institutionRepo.approve(id);
+      if (!result) throw DomainErrors.institutionNotFound();
+      void sendInstitutionApprovalEmail(result.userEmail, result.userName);
+      return result.institution;
     },
 
     async update(id: string, input: UpdateInstitutionInput) {
-      const institution = await prisma.institution.findUnique({
-        where: { id }
-      });
-
-      if (!institution) {
-        return null;
-      }
-
-      return prisma.institution.update({
-        where: { id },
-        data: {
-          name: input.name?.trim()
-        }
-      });
+      const data: { name?: string; email?: string; passwordHash?: string } = {};
+      if (input.name?.trim()) data.name = input.name.trim();
+      if (input.email) { EmailVO.create(input.email); data.email = input.email; }
+      if (input.password) data.passwordHash = hashPassword(input.password);
+      if (Object.keys(data).length === 0) return institutionRepo.findById(id);
+      return institutionRepo.updateWithUser(id, data);
     },
 
-    async delete(id: string) {
-      const institution = await prisma.institution.findUnique({
-        where: { id }
-      });
+    async updatePerfil(institutionId: string, data: { name?: string; email?: string }) {
+      await institutionRepo.updateLinkedUser(institutionId, data);
+    },
 
-      if (!institution) {
-        return null;
-      }
+    getTransactions(institutionId: string) {
+      return institutionRepo.findTransactions(institutionId);
+    },
 
-      await prisma.institution.delete({
-        where: { id }
-      });
-
-      return institution;
+    delete(id: string) {
+      return institutionRepo.delete(id);
     }
   };
 }

@@ -114,6 +114,11 @@ export async function updatePerfil(input: PerfilUpdateInput) {
     await apiClient(`/api/professores/${user.id}`, { method: 'PUT', body: input });
   } else if (user.role === 'partner') {
     await apiClient(`/api/parceiros/${user.id}`, { method: 'PUT', body: input });
+  } else if (user.role === 'institution') {
+    await apiClient('/api/instituicoes/perfil', {
+      method: 'PUT',
+      body: { name: input.name, email: input.email }
+    });
   }
 
   if (input.password) {

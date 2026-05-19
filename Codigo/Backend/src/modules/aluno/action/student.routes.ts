@@ -2,6 +2,7 @@
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
 import { createStudentService, type CreateStudentInput, type UpdateStudentInput } from '../application/student-service.js';
+import { PrismaStudentRepository } from '../infra/prisma-student.repository.js';
 import { toStudentListResponse, toStudentResponse } from '../responder/student-responder.js';
 
 const studentResponseSchema = {
@@ -62,10 +63,28 @@ const paginatedStudentSchema = {
 } as const;
 
 export async function studentRoutes(app: FastifyInstance) {
-  const studentService = createStudentService(app.prisma);
+  const studentService = createStudentService(new PrismaStudentRepository(app.prisma));
+
+  // Public — student self-registration
+  app.post<{ Body: CreateStudentInput }>('/api/auth/register', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+    schema: {
+      tags: ['Auth'],
+      summary: 'Cadastro publico de aluno (auto-registro)',
+      body: studentBodySchema,
+      response: { 201: { type: 'object', properties: { message: { type: 'string' } } }, 409: errorSchema }
+    }
+  }, async (request, reply) => {
+    try {
+      await studentService.create(request.body);
+      return reply.status(201).send({ message: 'Conta criada com sucesso. Faca login para continuar.' });
+    } catch (error) {
+      return sendErrorResponse(reply, error, 'Email, CPF ou RG ja cadastrado');
+    }
+  });
 
   app.get<{ Querystring: { institutionId?: string; page?: number; limit?: number } }>('/api/alunos', {
-    preHandler: [app.authenticate, requireRole('admin', 'professor')],
+    preHandler: [app.authenticate, requireRole('admin', 'professor', 'institution')],
     schema: {
       tags: ['Alunos'],
       summary: 'Lista alunos cadastrados (paginado)',

@@ -1,8 +1,10 @@
 import { apiClient } from '../../../shared/http/apiClient';
 import type { CreateProfessorInput, Professor, UpdateProfessorInput } from '../types/professor';
 
-export async function listProfessores(): Promise<Professor[]> {
-  const result = await apiClient<{ data: Professor[] }>('/api/professores?limit=200');
+export async function listProfessores(institutionId?: string): Promise<Professor[]> {
+  const params = new URLSearchParams({ limit: '200' });
+  if (institutionId) params.set('institutionId', institutionId);
+  const result = await apiClient<{ data: Professor[] }>(`/api/professores?${params}`);
   return result.data;
 }
 

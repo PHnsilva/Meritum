@@ -2,6 +2,8 @@
 import { requireRole } from '../../../shared/auth/require-role.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { createAdvantageService, type CreateAdvantageInput, type UpdateAdvantageInput } from '../application/advantage-service.js';
+import { PrismaAdvantageRepository } from '../infra/prisma-advantage.repository.js';
+import { PrismaStudentCoinRepository } from '../infra/prisma-student-coin.repository.js';
 import { toAdvantageListResponse, toAdvantageResponse, toRedemptionResponse } from '../responder/advantage-responder.js';
 
 const advantageSchema = {
@@ -45,7 +47,11 @@ const bodySchema = {
 const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
 export async function advantageRoutes(app: FastifyInstance) {
-  const service = createAdvantageService(app.prisma);
+  const service = createAdvantageService(
+    app.prisma,
+    new PrismaAdvantageRepository(app.prisma),
+    new PrismaStudentCoinRepository(app.prisma)
+  );
 
   // All authenticated — catalog (active advantages only)
   app.get('/api/vantagens', {
@@ -86,17 +92,20 @@ export async function advantageRoutes(app: FastifyInstance) {
     return toAdvantageListResponse(list);
   });
 
-  // Partner — all redemptions across their advantages
-  app.get('/api/vantagens/resgates', {
-    preHandler: [app.authenticate, requireRole('partner')],
+  // Partner or admin — all redemptions across a partner's advantages
+  app.get<{ Querystring: { partnerId?: string } }>('/api/vantagens/resgates', {
+    preHandler: [app.authenticate, requireRole('partner', 'admin')],
     schema: {
       tags: ['Vantagens'],
-      summary: 'Lista todos os resgates das vantagens da empresa parceira',
-      response: { 200: { type: 'array', items: redemptionSchema } }
+      summary: 'Lista todos os resgates das vantagens da empresa parceira (admin usa ?partnerId=)',
+      querystring: { type: 'object', properties: { partnerId: { type: 'string', format: 'uuid' } } },
+      response: { 200: { type: 'array', items: redemptionSchema }, 400: { type: 'object', properties: { message: { type: 'string' } } } }
     }
-  }, async (request) => {
-    const { sub } = request.user as { sub: string };
-    const list = await service.listPartnerRedemptions(sub);
+  }, async (request, reply) => {
+    const { sub, role } = request.user as { sub: string; role: string };
+    const partnerId = role === 'admin' ? request.query.partnerId : sub;
+    if (!partnerId) return reply.status(400).send({ message: 'partnerId e obrigatorio para admin' });
+    const list = await service.listPartnerRedemptions(partnerId);
     return list.map(toRedemptionResponse);
   });
 

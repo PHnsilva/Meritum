@@ -1,6 +1,6 @@
 export type ApiStatus = 'idle' | 'loading' | 'success' | 'error';
 
-export type UserRole = 'admin' | 'student' | 'professor' | 'partner';
+export type UserRole = 'admin' | 'student' | 'professor' | 'partner' | 'institution';
 
 export type AuthUser = {
   id: string;

@@ -1,14 +1,11 @@
 import { ArrowDown, ArrowLeft, ArrowUp, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Alert } from '../../../shared/components/Alert';
 import { Button } from '../../../shared/components/Button';
 import { PageHeader } from '../../../shared/components/PageHeader';
 import { SearchInput } from '../../../shared/components/SearchInput';
-import { SelectField } from '../../../shared/components/SelectField';
 import { getStoredUser } from '../../auth/services/authService';
-import { listAlunos } from '../../aluno/services/alunoService';
-import type { Aluno } from '../../aluno/types/aluno';
 import { listMeusResgates, listResgatesByAluno } from '../../vantagem/services/vantagemService';
 import type { Resgate } from '../../vantagem/types/vantagem';
 import { getExtratoAluno } from '../services/moedaService';
@@ -51,14 +48,15 @@ function buildEntries(extrato: ExtratoResponse, resgates: Resgate[]): Entry[] {
 export function ExtratoAlunoPage() {
   const storedUser = getStoredUser();
   const isStudent = storedUser?.role === 'student';
+  const [searchParams] = useSearchParams();
+  const paramId = searchParams.get('id') ?? '';
 
-  const [alunos, setAlunos] = useState<Aluno[]>([]);
-  const [studentId, setStudentId] = useState(isStudent ? storedUser.id : '');
+  const paramName = searchParams.get('name') ?? '';
+  const [studentId] = useState(isStudent ? storedUser.id : paramId);
   const [coinBalance, setCoinBalance] = useState<number | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [query, setQuery] = useState('');
   const [kindFilter, setKindFilter] = useState<'' | EntryKind>('');
-  const [loadingAlunos, setLoadingAlunos] = useState(!isStudent);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -86,26 +84,8 @@ export function ExtratoAlunoPage() {
   }
 
   useEffect(() => {
-    if (isStudent) {
-      void loadExtrato(storedUser.id);
-      return;
-    }
-    async function loadAlunos() {
-      try {
-        setAlunos(await listAlunos());
-      } catch {
-        setError('Nao foi possivel carregar alunos');
-      } finally {
-        setLoadingAlunos(false);
-      }
-    }
-    void loadAlunos();
+    if (studentId) void loadExtrato(studentId);
   }, []);
-
-  function handleAlunoChange(id: string) {
-    setStudentId(id);
-    void loadExtrato(id);
-  }
 
   const received = entries.filter((e) => e.kind === 'received').reduce((s, e) => s + e.amount, 0);
   const redeemed = entries.filter((e) => e.kind === 'redeemed').reduce((s, e) => s + e.amount, 0);
@@ -120,7 +100,7 @@ export function ExtratoAlunoPage() {
   return (
     <section className="stack">
       <PageHeader
-        title={isStudent ? 'Meu Extrato' : 'Extrato do Aluno'}
+        title={isStudent ? 'Meu Extrato' : `Extrato — ${paramName || 'Aluno'}`}
         description="Historico completo de recebimentos e resgates de moedas."
         actions={
           <>
@@ -128,7 +108,7 @@ export function ExtratoAlunoPage() {
               Atualizar
             </Button>
             {!isStudent && (
-              <Link className="button button--secondary" to="/">
+              <Link className="button button--secondary" to="/alunos">
                 <ArrowLeft size={16} />
                 <span>Voltar</span>
               </Link>
@@ -137,20 +117,14 @@ export function ExtratoAlunoPage() {
         }
       />
 
-      {!isStudent && (
-        <section className="work-panel">
-          <SelectField
-            label="Selecione o aluno"
-            value={studentId}
-            onChange={(e) => handleAlunoChange(e.target.value)}
-            placeholder={loadingAlunos ? 'Carregando...' : 'Selecione o aluno'}
-            options={alunos.map((a) => ({ value: a.id, label: `${a.name} — ${a.course}` }))}
-            disabled={loadingAlunos}
-          />
-        </section>
-      )}
-
       {error ? <Alert tone="error">{error}</Alert> : null}
+
+      {!studentId && !error && (
+        <div className="empty-state">
+          <strong>Nenhum aluno selecionado</strong>
+          <span>Acesse esta pagina a partir da lista de alunos.</span>
+        </div>
+      )}
 
       {coinBalance !== null && (
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>

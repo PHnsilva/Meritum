@@ -4,6 +4,7 @@ import { hashPassword } from '../../../shared/security/password-hasher.js';
 import { paginate, toPaginatedResult } from '../../../shared/pagination/pagination.js';
 import { sendPartnerApprovalEmail, sendPartnerRegistrationEmail } from '../../../shared/email/email-service.js';
 import { DomainErrors } from '../../../shared/errors/domain-errors.js';
+import type { PartnerRepository } from '../domain/partner.repository.js';
 
 export type CreatePartnerCompanyInput = {
   corporateName: string;
@@ -18,7 +19,7 @@ export type UpdatePartnerCompanyInput = Partial<CreatePartnerCompanyInput>;
 
 export type RegisterPartnerCompanyInput = CreatePartnerCompanyInput;
 
-export function createPartnerCompanyService(prisma: PrismaClient) {
+export function createPartnerCompanyService(prisma: PrismaClient, partnerRepo: PartnerRepository) {
   return {
     async list(page = 1, limit = 50, status?: 'PENDING' | 'APPROVED') {
       const where = status ? { status } : undefined;
@@ -99,10 +100,7 @@ export function createPartnerCompanyService(prisma: PrismaClient) {
     },
 
     async approve(id: string) {
-      const partner = await prisma.partnerCompany.findUnique({
-        where: { id },
-        include: { user: true }
-      });
+      const partner = await partnerRepo.findById(id);
       if (!partner) throw DomainErrors.partnerNotFound();
 
       const updated = await prisma.partnerCompany.update({

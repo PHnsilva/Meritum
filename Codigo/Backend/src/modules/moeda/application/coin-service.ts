@@ -1,8 +1,11 @@
-import type { PrismaClient } from '@prisma/client';
 import { MoedasEnviadasEvent } from '../../../shared/domain/events/moedas-enviadas-event.js';
 import { eventBus } from '../../../shared/domain/events/event-bus.js';
 import { DomainErrors } from '../../../shared/errors/domain-errors.js';
 import { CoinBalance } from '../../../shared/domain/value-objects/coin-balance.js';
+import type { UnitOfWork } from '../../../shared/infra/unit-of-work.js';
+import type { ProfessorBalancePort } from '../domain/professor-balance.port.js';
+import type { StudentBalancePort } from '../domain/student-balance.port.js';
+import type { TransactionRepository } from '../domain/transaction.repository.js';
 
 export type EnviarMoedasInput = {
   professorId: string;
@@ -11,56 +14,44 @@ export type EnviarMoedasInput = {
   motive: string;
 };
 
-export function createCoinService(prisma: PrismaClient) {
+export function createCoinService(
+  professorPort: ProfessorBalancePort,
+  studentPort: StudentBalancePort,
+  transactionRepo: TransactionRepository,
+  uow: UnitOfWork
+) {
   return {
     async enviarMoedas(input: EnviarMoedasInput) {
-      const professor = await prisma.professor.findUnique({
-        where: { id: input.professorId },
-        include: { user: true }
-      });
+      const professor = await professorPort.findById(input.professorId);
       if (!professor) throw DomainErrors.professorNotFound();
 
-      const balance = CoinBalance.create(professor.coinBalance);
-      balance.deduct(input.amount);
-
-      const student = await prisma.student.findUnique({
-        where: { id: input.studentId },
-        include: { user: true }
-      });
+      const student = await studentPort.findById(input.studentId);
       if (!student) throw DomainErrors.studentNotFound();
 
-      if (professor.institutionId !== student.institutionId) {
-        throw DomainErrors.differentInstitution();
-      }
+      if (professor.institutionId !== student.institutionId) throw DomainErrors.differentInstitution();
 
-      const transaction = await prisma.$transaction(async (tx) => {
-        await tx.professor.update({
-          where: { id: input.professorId },
-          data: { coinBalance: { decrement: input.amount } }
-        });
-        await tx.student.update({
-          where: { id: input.studentId },
-          data: { coinBalance: { increment: input.amount } }
-        });
-        return tx.transaction.create({
-          data: {
-            amount: input.amount,
-            motive: input.motive,
-            professorId: input.professorId,
-            studentId: input.studentId
-          },
-          include: {
-            professor: { include: { user: true } },
-            student: { include: { user: true } }
-          }
-        });
+      // Eager domain check gives a clear error message for the obvious case.
+      // The real concurrency guard is the conditional atomic decrement inside the TX below.
+      CoinBalance.create(professor.coinBalance).deduct(input.amount);
+
+      const transaction = await uow.run(async (tx) => {
+        // Atomic conditional decrement: only succeeds if balance >= amount at commit time.
+        const deducted = await professorPort.deductBalance(professor.id, input.amount, tx);
+        if (!deducted) throw DomainErrors.insufficientBalance();
+
+        await studentPort.addBalance(student.id, input.amount, tx);
+
+        return transactionRepo.create(
+          { professorId: professor.id, studentId: student.id, amount: input.amount, motive: input.motive },
+          tx
+        );
       });
 
       eventBus.publish(new MoedasEnviadasEvent(
-        input.professorId,
+        professor.id,
         professor.user.name,
         professor.user.email,
-        input.studentId,
+        student.id,
         student.user.name,
         student.user.email,
         input.amount,
@@ -71,32 +62,18 @@ export function createCoinService(prisma: PrismaClient) {
     },
 
     async extratoProfessor(professorId: string) {
-      const professor = await prisma.professor.findUnique({
-        where: { id: professorId }
-      });
+      const professor = await professorPort.findById(professorId);
       if (!professor) throw DomainErrors.professorNotFound();
 
-      const transactions = await prisma.transaction.findMany({
-        where: { professorId },
-        include: { student: { include: { user: true } } },
-        orderBy: { createdAt: 'desc' }
-      });
-
+      const transactions = await transactionRepo.findByProfessorId(professorId);
       return { coinBalance: professor.coinBalance, transactions };
     },
 
     async extratoAluno(studentId: string) {
-      const student = await prisma.student.findUnique({
-        where: { id: studentId }
-      });
+      const student = await studentPort.findById(studentId);
       if (!student) throw DomainErrors.studentNotFound();
 
-      const transactions = await prisma.transaction.findMany({
-        where: { studentId },
-        include: { professor: { include: { user: true } } },
-        orderBy: { createdAt: 'desc' }
-      });
-
+      const transactions = await transactionRepo.findByStudentId(studentId);
       return { coinBalance: student.coinBalance, transactions };
     }
   };

@@ -12,6 +12,7 @@ const domainErrorStatus: Record<string, number> = {
   DifferentInstitutionError: 400,
   AdvantageInactiveError: 400,
   AdvantageOwnershipError: 403,
+  AccountPendingError: 403,
   ValidationError: 422,
 };
 

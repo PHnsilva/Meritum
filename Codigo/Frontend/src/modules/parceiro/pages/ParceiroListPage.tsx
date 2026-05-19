@@ -1,4 +1,4 @@
-import { CheckCircle, Clock, Edit3, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { CheckCircle, Clock, Edit3, FileText, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert } from '../../../shared/components/Alert';
@@ -223,6 +223,9 @@ export function ParceiroListPage() {
                             {approving === parceiro.id ? 'Aprovando...' : 'Aprovar'}
                           </Button>
                         )}
+                        <Link className="icon-button" to={`/parceiros/${parceiro.id}/resgates`} aria-label="Resgates do parceiro">
+                          <FileText size={16} />
+                        </Link>
                         <Link className="icon-button" to={`/parceiros/${parceiro.id}/editar`} aria-label="Editar parceiro">
                           <Edit3 size={16} />
                         </Link>

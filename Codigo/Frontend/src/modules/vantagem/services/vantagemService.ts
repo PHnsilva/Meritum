@@ -48,3 +48,7 @@ export function listResgatesByVantagem(id: string): Promise<Resgate[]> {
 export function listPartnerResgates(): Promise<Resgate[]> {
   return apiClient<Resgate[]>('/api/vantagens/resgates');
 }
+
+export function listPartnerResgatesByAdmin(partnerId: string): Promise<Resgate[]> {
+  return apiClient<Resgate[]>(`/api/vantagens/resgates?partnerId=${partnerId}`);
+}

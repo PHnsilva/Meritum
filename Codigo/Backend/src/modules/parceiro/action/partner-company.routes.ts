@@ -2,6 +2,7 @@
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
 import { createPartnerCompanyService, type CreatePartnerCompanyInput, type RegisterPartnerCompanyInput, type UpdatePartnerCompanyInput } from '../application/partner-company-service.js';
+import { PrismaPartnerRepository } from '../infra/prisma-partner.repository.js';
 import { toPartnerCompanyListResponse, toPartnerCompanyResponse } from '../responder/partner-company-responder.js';
 
 const partnerCompanyResponseSchema = {
@@ -52,7 +53,7 @@ const paginatedPartnerSchema = {
 } as const;
 
 export async function partnerCompanyRoutes(app: FastifyInstance) {
-  const service = createPartnerCompanyService(app.prisma);
+  const service = createPartnerCompanyService(app.prisma, new PrismaPartnerRepository(app.prisma));
 
   // Public: partner self-registration (status = PENDING)
   app.post<{ Body: RegisterPartnerCompanyInput }>('/api/parceiros/solicitar', {

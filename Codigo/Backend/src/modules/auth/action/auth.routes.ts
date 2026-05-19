@@ -1,9 +1,9 @@
 ﻿import type { FastifyInstance } from 'fastify';
-import { createAuthService, type LoginInput, type UpdatePerfilInput } from '../application/auth-service.js';
+import { createAuthService, type LoginInput, type UpdatePerfilInput, type ChangePasswordInput } from '../application/auth-service.js';
+import { PrismaUserRepository } from '../infra/prisma-user.repository.js';
 import { toAuthUserResponse } from '../responder/auth-responder.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
-import { createStudentService, type CreateStudentInput } from '../../aluno/application/student-service.js';
 
 const authUserSchema = {
   type: 'object',
@@ -15,7 +15,7 @@ const authUserSchema = {
         id: { type: 'string' },
         name: { type: 'string' },
         email: { type: 'string' },
-        role: { type: 'string', enum: ['admin', 'student', 'professor', 'partner'] },
+        role: { type: 'string', enum: ['admin', 'student', 'professor', 'partner', 'institution'] },
         coinBalance: { type: 'integer', nullable: true },
         mustChangePassword: { type: 'boolean' },
         createdAt: { type: 'string', format: 'date-time' },
@@ -31,39 +31,7 @@ const tokenSchema = { type: 'object', properties: { token: { type: 'string' } } 
 type PerfilBody = { entityId: string } & UpdatePerfilInput;
 
 export async function authRoutes(app: FastifyInstance) {
-  const authService = createAuthService(app.prisma);
-  const studentService = createStudentService(app.prisma);
-
-  // Public — student self-registration
-  app.post<{ Body: CreateStudentInput }>('/api/auth/register', {
-    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
-    schema: {
-      tags: ['Auth'],
-      summary: 'Cadastro publico de aluno (auto-registro)',
-      body: {
-        type: 'object',
-        required: ['name', 'email', 'cpf', 'rg', 'address', 'institutionId', 'course', 'password'],
-        properties: {
-          name: { type: 'string', minLength: 2 },
-          email: { type: 'string', format: 'email' },
-          cpf: { type: 'string', minLength: 11 },
-          rg: { type: 'string', minLength: 3 },
-          address: { type: 'string', minLength: 3 },
-          institutionId: { type: 'string', format: 'uuid' },
-          course: { type: 'string', minLength: 2 },
-          password: { type: 'string', minLength: 6 }
-        }
-      },
-      response: { 201: { type: 'object', properties: { message: { type: 'string' } } }, 409: messageSchema }
-    }
-  }, async (request, reply) => {
-    try {
-      await studentService.create(request.body);
-      return reply.status(201).send({ message: 'Conta criada com sucesso. Faca login para continuar.' });
-    } catch (error) {
-      return sendErrorResponse(reply, error, 'Email, CPF ou RG ja cadastrado');
-    }
-  });
+  const authService = createAuthService(new PrismaUserRepository(app.prisma));
 
   app.post<{ Body: LoginInput }>('/api/auth/login', {
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
@@ -105,6 +73,30 @@ export async function authRoutes(app: FastifyInstance) {
     const { sub, role } = request.user as { sub: string; role: string };
     const token = app.jwt.sign({ sub, role });
     return { token };
+  });
+
+  app.post<{ Body: ChangePasswordInput }>('/api/auth/alterar-senha', {
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    schema: {
+      tags: ['Auth'],
+      summary: 'Troca senha temporaria por senha definitiva',
+      body: {
+        type: 'object',
+        required: ['email', 'newPassword'],
+        properties: {
+          email: { type: 'string', format: 'email' },
+          newPassword: { type: 'string', minLength: 6 }
+        }
+      },
+      response: { 200: messageSchema, 404: messageSchema }
+    }
+  }, async (request, reply) => {
+    try {
+      await authService.changePassword(request.body);
+      return { message: 'Senha alterada com sucesso' };
+    } catch (error) {
+      return sendErrorResponse(reply, error);
+    }
   });
 
   app.put<{ Body: PerfilBody }>('/api/auth/perfil', {

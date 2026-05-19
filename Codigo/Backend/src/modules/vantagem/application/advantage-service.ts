@@ -3,6 +3,9 @@ import type { PrismaClient } from '@prisma/client';
 import { DomainErrors } from '../../../shared/errors/domain-errors.js';
 import { CoinBalance } from '../../../shared/domain/value-objects/coin-balance.js';
 import { sendStudentCouponEmail, sendPartnerRedemptionEmail } from '../../../shared/email/email-service.js';
+import type { AdvantageRepository } from '../domain/advantage.repository.js';
+import { AdvantageEntity } from '../domain/advantage.entity.js';
+import type { StudentCoinPort } from '../domain/student-coin.port.js';
 
 export type CreateAdvantageInput = {
   title: string;
@@ -17,7 +20,7 @@ function generateCode(): string {
   return randomBytes(4).toString('hex').toUpperCase();
 }
 
-export function createAdvantageService(prisma: PrismaClient) {
+export function createAdvantageService(prisma: PrismaClient, advantageRepo: AdvantageRepository, studentCoinPort: StudentCoinPort) {
   return {
     async list() {
       return prisma.advantage.findMany({
@@ -57,11 +60,9 @@ export function createAdvantageService(prisma: PrismaClient) {
     },
 
     async update(id: string, requesterId: string, requesterRole: string, input: UpdateAdvantageInput) {
-      const advantage = await prisma.advantage.findUnique({ where: { id } });
+      const advantage = await advantageRepo.findById(id);
       if (!advantage) throw DomainErrors.advantageNotFound();
-      if (requesterRole !== 'admin' && advantage.partnerId !== requesterId) {
-        throw DomainErrors.advantageOwnership();
-      }
+      advantage.verifyOwnership(requesterId, requesterRole);
 
       return prisma.advantage.update({
         where: { id },
@@ -71,42 +72,41 @@ export function createAdvantageService(prisma: PrismaClient) {
     },
 
     async delete(id: string, requesterId: string, requesterRole: string) {
-      const advantage = await prisma.advantage.findUnique({ where: { id } });
+      const advantage = await advantageRepo.findById(id);
       if (!advantage) throw DomainErrors.advantageNotFound();
-      if (requesterRole !== 'admin' && advantage.partnerId !== requesterId) {
-        throw DomainErrors.advantageOwnership();
-      }
+      advantage.verifyOwnership(requesterId, requesterRole);
+
       await prisma.advantage.delete({ where: { id } });
-      return advantage;
     },
 
     async redeem(advantageId: string, studentId: string) {
-      const advantage = await prisma.advantage.findUnique({
+      const advantageData = await prisma.advantage.findUnique({
         where: { id: advantageId },
         include: { partner: { include: { user: true } } }
       });
-      if (!advantage) throw DomainErrors.advantageNotFound();
-      if (!advantage.isActive) throw DomainErrors.advantageInactive();
+      if (!advantageData) throw DomainErrors.advantageNotFound();
 
-      const student = await prisma.student.findUnique({
-        where: { id: studentId },
-        include: { user: true }
-      });
+      // Domain check via entity — no extra query needed
+      const advantage = new AdvantageEntity(advantageData.id, advantageData.partnerId, advantageData.title, advantageData.costInCoins, advantageData.isActive);
+      advantage.assertAvailable();
+
+      const student = await studentCoinPort.findById(studentId);
       if (!student) throw DomainErrors.studentNotFound();
-      if (!CoinBalance.create(student.coinBalance).canDeduct(advantage.costInCoins)) {
+      // Eager check for a clear error message on the obvious case.
+      // The real guard is the conditional atomic decrement inside the TX below.
+      if (!CoinBalance.create(student.coinBalance).canDeduct(advantageData.costInCoins)) {
         throw DomainErrors.insufficientBalance();
       }
 
       const code = generateCode();
 
       const redemption = await prisma.$transaction(async (tx) => {
-        await tx.student.update({
-          where: { id: studentId },
-          data: { coinBalance: { decrement: advantage.costInCoins } }
-        });
+        // Atomic conditional decrement — real concurrency guard, balance cannot go negative.
+        const deducted = await studentCoinPort.deductCoins(studentId, advantageData.costInCoins, tx);
+        if (!deducted) throw DomainErrors.insufficientBalance();
 
         return tx.redemption.create({
-          data: { code, coinCost: advantage.costInCoins, studentId, advantageId },
+          data: { code, coinCost: advantageData.costInCoins, studentId, advantageId },
           include: { advantage: { include: { partner: { include: { user: true } } } }, student: { include: { user: true } } }
         });
       });
@@ -114,17 +114,17 @@ export function createAdvantageService(prisma: PrismaClient) {
       void sendStudentCouponEmail(
         student.user.email,
         student.user.name,
-        advantage.title,
-        advantage.partner.corporateName,
-        advantage.costInCoins,
+        advantageData.title,
+        advantageData.partner.corporateName,
+        advantageData.costInCoins,
         code
       );
       void sendPartnerRedemptionEmail(
-        advantage.partner.user.email,
-        advantage.partner.corporateName,
+        advantageData.partner.user.email,
+        advantageData.partner.corporateName,
         student.user.name,
-        advantage.title,
-        advantage.costInCoins,
+        advantageData.title,
+        advantageData.costInCoins,
         code
       );
 
@@ -143,7 +143,7 @@ export function createAdvantageService(prisma: PrismaClient) {
     },
 
     async listRedemptionsByAdvantage(advantageId: string, requesterId: string, requesterRole: string) {
-      const advantage = await prisma.advantage.findUnique({ where: { id: advantageId } });
+      const advantage = await advantageRepo.findById(advantageId);
       if (!advantage) throw DomainErrors.advantageNotFound();
       if (requesterRole === 'partner' && advantage.partnerId !== requesterId) {
         throw DomainErrors.advantageOwnership();

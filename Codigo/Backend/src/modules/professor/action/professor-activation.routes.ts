@@ -1,12 +1,12 @@
-﻿import type { FastifyInstance } from 'fastify';
-import { createAuthService } from '../../auth/application/auth-service.js';
-import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
+import type { FastifyInstance } from 'fastify';
+import { createProfessorService } from '../application/professor-service.js';
+import { PrismaProfessorRepository } from '../infra/prisma-professor.repository.js';
 import { sendProfessorActivationEmail } from '../../../shared/email/email-service.js';
 
 const messageSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
 export async function professorActivationRoutes(app: FastifyInstance) {
-  const authService = createAuthService(app.prisma);
+  const professorService = createProfessorService(new PrismaProfessorRepository(app.prisma));
 
   app.post<{ Body: { email: string } }>('/api/professores/ativar', {
     config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
@@ -21,7 +21,7 @@ export async function professorActivationRoutes(app: FastifyInstance) {
       response: { 200: messageSchema }
     }
   }, async (request) => {
-    const result = await authService.requestActivation(request.body.email);
+    const result = await professorService.requestActivation(request.body.email);
 
     // Dispara email apenas se professor existir — nunca vaza a existência do email
     if (result) {
@@ -30,29 +30,4 @@ export async function professorActivationRoutes(app: FastifyInstance) {
 
     return { message: 'Se o email estiver cadastrado, voce recebera a senha temporaria em instantes.' };
   });
-
-  app.post<{ Body: { email: string; newPassword: string } }>('/api/auth/alterar-senha', {
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-    schema: {
-      tags: ['Auth'],
-      summary: 'Troca senha temporaria por senha definitiva',
-      body: {
-        type: 'object',
-        required: ['email', 'newPassword'],
-        properties: {
-          email: { type: 'string', format: 'email' },
-          newPassword: { type: 'string', minLength: 6 }
-        }
-      },
-      response: { 200: messageSchema, 404: messageSchema }
-    }
-  }, async (request, reply) => {
-    try {
-      await authService.changePassword(request.body);
-      return { message: 'Senha alterada com sucesso' };
-    } catch (error) {
-      return sendErrorResponse(reply, error);
-    }
-  });
 }
-
