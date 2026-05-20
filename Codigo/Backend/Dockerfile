@@ -10,6 +10,10 @@ COPY . .
 
 RUN npm run prisma:generate
 
+RUN npm run build
+
+RUN npx prisma migrate deploy
+
 EXPOSE 3333
 
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "start"]
