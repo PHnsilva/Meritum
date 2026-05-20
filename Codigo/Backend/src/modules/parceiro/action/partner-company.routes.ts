@@ -65,7 +65,9 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     try {
       const partner = await app.partnerService.register(request.body);
-      return reply.status(201).send(toPartnerCompanyResponse(partner));
+      const dto = await app.partnerService.findById(partner.id);
+      if (!dto) return reply.status(404).send({ message: 'Empresa parceira nao encontrada' });
+      return reply.status(201).send(toPartnerCompanyResponse(dto));
     } catch (error) {
       return sendErrorResponse(reply, error, 'Empresa parceira ja cadastrada com email ou CNPJ informado');
     }
@@ -82,8 +84,10 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const partner = await app.partnerService.approve(request.params.id);
-      return toPartnerCompanyResponse(partner);
+      await app.partnerService.approve(request.params.id);
+      const dto = await app.partnerService.findById(request.params.id);
+      if (!dto) return reply.status(404).send({ message: 'Empresa parceira nao encontrada' });
+      return toPartnerCompanyResponse(dto);
     } catch (error) {
       return sendErrorResponse(reply, error, 'Empresa parceira nao encontrada');
     }
@@ -135,7 +139,9 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     try {
       const partnerCompany = await app.partnerService.create(request.body);
-      return reply.status(201).send(toPartnerCompanyResponse(partnerCompany));
+      const dto = await app.partnerService.findById(partnerCompany.id);
+      if (!dto) return reply.status(404).send({ message: 'Empresa parceira nao encontrada' });
+      return reply.status(201).send(toPartnerCompanyResponse(dto));
     } catch (error) {
       return sendErrorResponse(reply, error, 'Empresa parceira ja cadastrada com email ou CNPJ informado');
     }
@@ -152,9 +158,10 @@ export async function partnerCompanyRoutes(app: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const partnerCompany = await app.partnerService.update(request.params.id, request.body);
-      if (!partnerCompany) return reply.status(404).send({ message: 'Empresa parceira nao encontrada' });
-      return toPartnerCompanyResponse(partnerCompany);
+      await app.partnerService.update(request.params.id, request.body);
+      const dto = await app.partnerService.findById(request.params.id);
+      if (!dto) return reply.status(404).send({ message: 'Empresa parceira nao encontrada' });
+      return toPartnerCompanyResponse(dto);
     } catch (error) {
       return sendErrorResponse(reply, error, 'Empresa parceira ja cadastrada com email ou CNPJ informado');
     }

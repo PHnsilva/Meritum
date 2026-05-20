@@ -26,6 +26,10 @@ export function createInstitutionService(
       return institutionRepo.findById(id);
     },
 
+    findByIdWithRelations(id: string) {
+      return institutionRepo.findByIdWithRelations(id);
+    },
+
     findByUserId(userId: string) {
       return institutionRepo.findByUserId(userId);
     },

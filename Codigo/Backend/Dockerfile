@@ -12,8 +12,10 @@ RUN npm run prisma:generate
 
 RUN npm run build
 
-RUN npx prisma migrate deploy
+COPY entrypoint.sh /app/entrypoint.sh
+
+RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 3333
 
-CMD ["npm", "run", "start"]
+ENTRYPOINT ["/app/entrypoint.sh"]
