@@ -62,6 +62,7 @@ export class TestFactories {
       Address.create(overrides.address ?? 'Rua Test 123'),
       Course.create(overrides.course ?? 'Engenharia'),
       { name: 'Test Student', email: overrides.email ?? 'student@test.com' },
+      { id: overrides.institutionId ?? 'test-inst-123', name: 'Test Institution' },
       overrides.coinBalance ?? 100
     );
   }

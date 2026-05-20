@@ -16,4 +16,5 @@ export const DomainErrors = {
   advantageNotFound: () => createError('Vantagem nao encontrada', 'AdvantageNotFoundError'),
   advantageInactive: () => createError('Vantagem nao esta disponivel para resgate', 'AdvantageInactiveError'),
   advantageOwnership: () => createError('Voce nao tem permissao para modificar esta vantagem', 'AdvantageOwnershipError'),
+  ownershipError: () => createError('Voce nao tem permissao para acessar este recurso', 'OwnershipError'),
 };

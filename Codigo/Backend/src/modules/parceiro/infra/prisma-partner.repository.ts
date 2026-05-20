@@ -28,14 +28,15 @@ function toReadModel(row: PartnerRow): PartnerReadModel {
   };
 }
 
-function toEntity(row: PartnerRow): PartnerEntity {
-  return new PartnerEntity(
+function toEntity(row: PartnerRow): PartnerEntity & PartnerReadModel {
+  const entity = new PartnerEntity(
     row.id,
     row.corporateName,
     EmailVO.create(row.user.email),
     row.status as PartnerStatus,
     { name: row.user.name, email: row.user.email }
   );
+  return Object.assign(entity, toReadModel(row));
 }
 
 const include = { user: true } as const;

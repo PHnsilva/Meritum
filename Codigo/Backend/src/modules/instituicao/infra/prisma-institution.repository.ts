@@ -6,14 +6,15 @@ import type { InstitutionData, InstitutionRepository, RegisterInstitutionData } 
 export class PrismaInstitutionRepository implements InstitutionRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  private toEntity(raw: any): InstitutionEntity {
-    return new InstitutionEntity(
+  private toEntity(raw: any): InstitutionEntity & { createdAt: Date; updatedAt: Date } {
+    const entity = new InstitutionEntity(
       raw.id,
       raw.name,
       EmailVO.create(raw.user?.email || ''),
       raw.status,
       { id: raw.user?.id || '', name: raw.user?.name || '', email: raw.user?.email || '' }
     );
+    return Object.assign(entity, { createdAt: raw.createdAt, updatedAt: raw.updatedAt });
   }
 
   findAll(status?: 'PENDING' | 'APPROVED'): Promise<InstitutionData[]> {
