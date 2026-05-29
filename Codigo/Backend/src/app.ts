@@ -58,6 +58,7 @@ import { PrismaAdvantageRepository } from './modules/vantagem/infra/prisma-advan
 import { PrismaStudentCoinRepository } from './modules/vantagem/infra/prisma-student-coin.repository.js';
 import { CoinQueryAdapter } from './modules/moeda/infra/coin-query.adapter.js';
 import { AdvantageQueryAdapter } from './modules/vantagem/infra/advantage-query.adapter.js';
+import { RabbitMqEventTransport } from './shared/infra/messaging/rabbitmq-event-transport.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -71,51 +72,76 @@ declare module 'fastify' {
   }
 }
 
-function registerEventHandlers() {
-  eventBus.subscribe(MoedasEnviadasEvent, async (e) => {
+async function registerEventHandlers() {
+  eventBus.clearSubscribers();
+
+  await eventBus.subscribe(MoedasEnviadasEvent, async (e) => {
     await Promise.allSettled([
       sendCoinReceivedEmail({ studentName: e.studentName, studentEmail: e.studentEmail, professorName: e.professorName, amount: e.amount, motive: e.motive }),
       sendCoinSentConfirmationEmail({ professorName: e.professorName, professorEmail: e.professorEmail, studentName: e.studentName, amount: e.amount, motive: e.motive }),
     ]);
   });
 
-  eventBus.subscribe(VantagemResgataEvent, async (e) => {
+  await eventBus.subscribe(VantagemResgataEvent, async (e) => {
     await Promise.allSettled([
       sendStudentCouponEmail(e.studentEmail, e.studentName, e.advantageTitle, e.partnerName, e.coinCost, e.code),
       sendPartnerRedemptionEmail(e.partnerEmail, e.partnerName, e.studentName, e.advantageTitle, e.coinCost, e.code),
     ]);
   });
 
-  eventBus.subscribe(ParceiroRegistradoEvent, async (e) => {
+  await eventBus.subscribe(ParceiroRegistradoEvent, async (e) => {
     await sendPartnerRegistrationEmail(e.partnerEmail, e.partnerName);
   });
 
-  eventBus.subscribe(ParceiroAprovadoEvent, async (e) => {
+  await eventBus.subscribe(ParceiroAprovadoEvent, async (e) => {
     await sendPartnerApprovalEmail(e.partnerEmail, e.partnerName);
   });
 
-  eventBus.subscribe(InstituicaoRegistradaEvent, async (e) => {
+  await eventBus.subscribe(InstituicaoRegistradaEvent, async (e) => {
     await sendInstitutionRegistrationEmail(e.userEmail, e.institutionName);
   });
 
-  eventBus.subscribe(InstituicaoAprovadaEvent, async (e) => {
+  await eventBus.subscribe(InstituicaoAprovadaEvent, async (e) => {
     await sendInstitutionApprovalEmail(e.userEmail, e.userName);
   });
 
-  eventBus.subscribe(AlunoCriadoEvent, async (e) => {
+  await eventBus.subscribe(AlunoCriadoEvent, async (e) => {
     await sendStudentWelcomeEmail(e.studentEmail, e.studentName, e.institutionName);
   });
 
-  eventBus.subscribe(ProfessorCriadoEvent, async (e) => {
+  await eventBus.subscribe(ProfessorCriadoEvent, async (e) => {
     await sendProfessorActivationEmail(e.professorEmail, e.professorName, e.tempPassword);
   });
 
-  eventBus.subscribe(ProfessorAtivacaoSolicitadaEvent, async (e) => {
+  await eventBus.subscribe(ProfessorAtivacaoSolicitadaEvent, async (e) => {
     await sendProfessorActivationEmail(e.professorEmail, e.professorName, e.tempPassword);
   });
 
-  eventBus.subscribe(UserPasswordChangedEvent, async (e) => {
+  await eventBus.subscribe(UserPasswordChangedEvent, async (e) => {
     console.log(`[SECURITY] User password changed: ${e.userEmail} (${e.userId})`);
+  });
+}
+
+async function configureEventTransport(app: FastifyInstance) {
+  const rabbitUrl = process.env.RABBITMQ_URL;
+
+  if (!rabbitUrl) {
+    app.log.info('RabbitMQ disabled. Domain events will use the in-memory event bus.');
+    return;
+  }
+
+  const transport = new RabbitMqEventTransport(
+    rabbitUrl,
+    process.env.RABBITMQ_EXCHANGE ?? 'meritum.domain-events',
+    process.env.RABBITMQ_QUEUE_PREFIX ?? 'meritum'
+  );
+
+  await transport.connect();
+  eventBus.useTransport(transport);
+  app.log.info('RabbitMQ enabled for domain events.');
+
+  app.addHook('onClose', async () => {
+    await eventBus.closeTransport();
   });
 }
 
@@ -149,9 +175,10 @@ function registerServiceFactories(app: FastifyInstance) {
 }
 
 export async function buildApp() {
-  registerEventHandlers();
-
   const app = Fastify({ logger: true });
+
+  await configureEventTransport(app);
+  await registerEventHandlers();
 
   await app.register(cors, { origin: true });
 

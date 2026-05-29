@@ -1,5 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { getTestApp, closeTestApp, getAdminToken, authHeader, signToken } from './helpers/app-factory.js';
+import { MoedasEnviadasEvent } from '../shared/domain/events/moedas-enviadas-event.js';
+import { eventBus } from '../shared/domain/events/event-bus.js';
 
 const ts = Date.now();
 
@@ -9,6 +11,7 @@ describe('Moedas', () => {
   let institutionId: string;
   let professorId: string;
   let studentId: string;
+  let studentToken: string;
 
   beforeAll(async () => {
     adminToken = await getAdminToken();
@@ -53,6 +56,7 @@ describe('Moedas', () => {
       }
     });
     studentId = (JSON.parse(alunoRes.body) as { id: string }).id;
+    studentToken = await signToken(studentId, 'student');
   });
 
   afterAll(async () => {
@@ -69,7 +73,7 @@ describe('Moedas', () => {
       method: 'POST',
       url: '/api/moedas/enviar',
       headers: authHeader(professorToken),
-      body: { professorId, studentId, amount: 9999, motive: 'Teste' }
+      body: { studentId, amount: 9999, motive: 'Teste' }
     });
     expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body) as { message: string };
@@ -108,7 +112,7 @@ describe('Moedas', () => {
       method: 'POST',
       url: '/api/moedas/enviar',
       headers: authHeader(professorToken),
-      body: { professorId, studentId: student2Id, amount: 1, motive: 'Teste' }
+      body: { studentId: student2Id, amount: 1, motive: 'Teste' }
     });
     expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body) as { message: string };
@@ -116,6 +120,59 @@ describe('Moedas', () => {
 
     await app.inject({ method: 'DELETE', url: `/api/alunos/${student2Id}`, headers: authHeader(adminToken) });
     await app.inject({ method: 'DELETE', url: `/api/instituicoes/${inst2Id}`, headers: authHeader(adminToken) });
+  });
+
+  it('professor envia moedas, registra transacao e publica evento para emails', async () => {
+    const app = await getTestApp();
+    const publishSpy = vi.spyOn(eventBus, 'publish').mockImplementation(() => undefined);
+
+    try {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/moedas/enviar',
+        headers: authHeader(professorToken),
+        body: { studentId, amount: 25, motive: 'Excelente participacao' }
+      });
+
+      expect(res.statusCode).toBe(201);
+      const transaction = JSON.parse(res.body) as {
+        amount: number;
+        motive: string;
+        professor: { id: string; email: string };
+        student: { id: string; email: string };
+      };
+      expect(transaction.amount).toBe(25);
+      expect(transaction.motive).toBe('Excelente participacao');
+      expect(transaction.professor.id).toBe(professorId);
+      expect(transaction.student.id).toBe(studentId);
+
+      const event = publishSpy.mock.calls[0]?.[0];
+      expect(event).toBeInstanceOf(MoedasEnviadasEvent);
+      expect(event).toMatchObject({
+        professorId,
+        professorEmail: transaction.professor.email,
+        studentId,
+        studentEmail: transaction.student.email,
+        amount: 25,
+        motive: 'Excelente participacao'
+      });
+
+      const professorExtrato = await app.inject({
+        method: 'GET',
+        url: `/api/moedas/extrato/professor/${professorId}`,
+        headers: authHeader(adminToken)
+      });
+      expect(JSON.parse(professorExtrato.body).coinBalance).toBe(975);
+
+      const studentExtrato = await app.inject({
+        method: 'GET',
+        url: `/api/moedas/extrato/aluno/${studentId}`,
+        headers: authHeader(adminToken)
+      });
+      expect(JSON.parse(studentExtrato.body).coinBalance).toBe(25);
+    } finally {
+      publishSpy.mockRestore();
+    }
   });
 
   it('admin pode ver extrato do professor', async () => {
@@ -144,6 +201,24 @@ describe('Moedas', () => {
     expect(Array.isArray(body.transactions)).toBe(true);
   });
 
+  it('aluno pode ver apenas o proprio extrato', async () => {
+    const app = await getTestApp();
+    const ownRes = await app.inject({
+      method: 'GET',
+      url: `/api/moedas/extrato/aluno/${studentId}`,
+      headers: authHeader(studentToken)
+    });
+    expect(ownRes.statusCode).toBe(200);
+
+    const otherStudentToken = await signToken('00000000-0000-0000-0000-000000000000', 'student');
+    const otherRes = await app.inject({
+      method: 'GET',
+      url: `/api/moedas/extrato/aluno/${studentId}`,
+      headers: authHeader(otherStudentToken)
+    });
+    expect(otherRes.statusCode).toBe(403);
+  });
+
   it('professor inexistente no extrato retorna 404', async () => {
     const app = await getTestApp();
     const res = await app.inject({
@@ -160,7 +235,7 @@ describe('Moedas', () => {
       method: 'POST',
       url: '/api/moedas/enviar',
       headers: authHeader(adminToken),
-      body: { professorId, studentId, amount: 1, motive: 'Teste' }
+      body: { studentId, amount: 1, motive: 'Teste' }
     });
     expect(res.statusCode).toBe(403);
   });

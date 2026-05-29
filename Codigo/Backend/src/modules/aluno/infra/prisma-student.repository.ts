@@ -109,7 +109,13 @@ export class PrismaStudentRepository implements StudentRepository {
   async delete(id: string): Promise<StudentEntity | null> {
     const raw = await this.prisma.student.findUnique({ where: { id }, include });
     if (!raw) return null;
-    await this.prisma.user.delete({ where: { id: raw.userId } });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.transaction.deleteMany({ where: { studentId: id } });
+      await tx.redemption.deleteMany({ where: { studentId: id } });
+      await tx.user.delete({ where: { id: raw.userId } });
+    });
+
     return this.toEntity(raw);
   }
 }

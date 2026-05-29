@@ -23,6 +23,23 @@ Banco: `meritum`
 Usuario: `admin`
 Senha: `admin`
 
+## Configuracao do RabbitMQ
+
+O RabbitMQ e opcional em desenvolvimento local. Quando `RABBITMQ_URL` estiver
+configurada, os eventos de dominio do backend passam pela fila; sem essa variavel,
+o backend usa o barramento em memoria.
+
+```env
+RABBITMQ_URL="amqp://meritum:meritum@localhost:5672"
+RABBITMQ_EXCHANGE="meritum.domain-events"
+RABBITMQ_QUEUE_PREFIX="meritum"
+```
+
+No `docker-compose.yml` da raiz, o RabbitMQ ja sobe com painel de administracao em
+`http://localhost:15672` usando usuario `meritum` e senha `meritum`.
+Mensagens que falharem no processamento sao encaminhadas para filas dead-letter
+com sufixo `.dead-letter`.
+
 ## Instalacao
 
 ```bash

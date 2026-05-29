@@ -3,25 +3,48 @@ import { InstitutionEntity } from '../domain/institution.entity.js';
 import { EmailVO } from '../../../shared/domain/value-objects/email-vo.js';
 import type { InstitutionData, InstitutionRepository, RegisterInstitutionData } from '../domain/institution.repository.js';
 
+type InstitutionRaw = {
+  id: string;
+  name: string;
+  status: 'PENDING' | 'APPROVED';
+  createdAt: Date;
+  updatedAt: Date;
+  user?: { id: string; name: string; email: string } | null;
+};
+
 export class PrismaInstitutionRepository implements InstitutionRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  private toEntity(raw: any): InstitutionEntity & { createdAt: Date; updatedAt: Date } {
+  private toEntity(raw: InstitutionRaw): InstitutionEntity & { createdAt: Date; updatedAt: Date } {
     const entity = new InstitutionEntity(
       raw.id,
       raw.name,
-      EmailVO.create(raw.user?.email || ''),
+      raw.user?.email ? EmailVO.create(raw.user.email) : null,
       raw.status,
-      { id: raw.user?.id || '', name: raw.user?.name || '', email: raw.user?.email || '' }
+      raw.user ? { id: raw.user.id, name: raw.user.name, email: raw.user.email } : null
     );
     return Object.assign(entity, { createdAt: raw.createdAt, updatedAt: raw.updatedAt });
   }
 
-  findAll(status?: 'PENDING' | 'APPROVED'): Promise<InstitutionData[]> {
-    return this.prisma.institution.findMany({
+  private toData(raw: InstitutionRaw): InstitutionData {
+    return {
+      id: raw.id,
+      name: raw.name,
+      status: raw.status,
+      createdAt: raw.createdAt,
+      updatedAt: raw.updatedAt,
+      ...(raw.user?.email ? { userEmail: raw.user.email } : {}),
+      ...(raw.user?.name ? { userName: raw.user.name } : {})
+    };
+  }
+
+  async findAll(status?: 'PENDING' | 'APPROVED'): Promise<InstitutionData[]> {
+    const rows = await this.prisma.institution.findMany({
       where: status ? { status } : undefined,
+      include: { user: true },
       orderBy: { name: 'asc' }
     });
+    return rows.map((row) => this.toData(row));
   }
 
   async findById(id: string): Promise<InstitutionEntity | null> {
@@ -32,11 +55,12 @@ export class PrismaInstitutionRepository implements InstitutionRepository {
     return inst ? this.toEntity(inst) : null;
   }
 
-  findByIdWithRelations(id: string): Promise<InstitutionData | null> {
-    return this.prisma.institution.findUnique({
+  async findByIdWithRelations(id: string): Promise<InstitutionData | null> {
+    const row = await this.prisma.institution.findUnique({
       where: { id },
       include: { user: true }
-    }) as Promise<InstitutionData | null>;
+    });
+    return row ? this.toData(row) : null;
   }
 
   async findByUserId(userId: string): Promise<InstitutionEntity | null> {

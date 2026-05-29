@@ -99,7 +99,7 @@ export function AppRoutes() {
         <Route path="/professores/:id/editar" element={<RoleGuard blocked={nonAdmin}><ProfessorEditPage /></RoleGuard>} />
 
         {/* Professor routes */}
-        <Route path="/moedas" element={<RoleGuard blocked={['student', 'partner']}><EnviarMoedasPage /></RoleGuard>} />
+        <Route path="/moedas" element={<RoleGuard blocked={['student', 'partner', 'admin', 'institution']}><EnviarMoedasPage /></RoleGuard>} />
         <Route path="/moedas/extrato/professor" element={<RoleGuard blocked={['student', 'partner']}><ExtratoProfessorPage /></RoleGuard>} />
 
         {/* Student routes */}

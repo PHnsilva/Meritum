@@ -21,6 +21,27 @@ services:
       timeout: 5s
       retries: 10
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: meritum-rabbitmq
+
+    environment:
+      RABBITMQ_DEFAULT_USER: meritum
+      RABBITMQ_DEFAULT_PASS: meritum
+
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: ./Codigo/Backend
@@ -35,11 +56,14 @@ services:
 
     environment:
       DATABASE_URL: postgresql://admin:admin@postgres:5432/meritum?schema=public
+      RABBITMQ_URL: amqp://meritum:meritum@rabbitmq:5672
       PORT: 3333
       HOST: 0.0.0.0
 
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
 
     volumes:
@@ -69,3 +93,4 @@ services:
 
 volumes:
   postgres_data:
+  rabbitmq_data:

@@ -7,17 +7,17 @@ export class InstitutionEntity {
   constructor(
     readonly id: string,
     readonly name: string,
-    readonly email: EmailVO,
+    readonly email: EmailVO | null,
     readonly status: InstitutionStatus,
-    readonly user: { id: string; name: string; email: string }
+    readonly user: { id: string; name: string; email: string } | null
   ) {}
 
   verifyOwnership(userId: string): void {
-    if (this.user.id !== userId) throw DomainErrors.ownershipError();
+    if (this.user?.id !== userId) throw DomainErrors.ownershipError();
   }
 
   canQueryData(userId: string): boolean {
-    return this.user.id === userId;
+    return this.user?.id === userId;
   }
 
   assertApproved(): void {

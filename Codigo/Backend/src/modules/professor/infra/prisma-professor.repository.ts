@@ -81,7 +81,12 @@ export class PrismaProfessorRepository implements ProfessorRepository {
   async delete(id: string): Promise<ProfessorReadModel | null> {
     const professor = await this.prisma.professor.findUnique({ where: { id }, include });
     if (!professor) return null;
-    await this.prisma.user.delete({ where: { id: professor.userId } });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.transaction.deleteMany({ where: { professorId: id } });
+      await tx.user.delete({ where: { id: professor.userId } });
+    });
+
     return professor as ProfessorReadModel;
   }
 

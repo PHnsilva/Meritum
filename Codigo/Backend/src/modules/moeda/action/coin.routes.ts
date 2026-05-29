@@ -108,10 +108,14 @@ export async function coinRoutes(app: FastifyInstance) {
         required: ['studentId'],
         properties: { studentId: { type: 'string', format: 'uuid' } }
       },
-      response: { 200: extratoSchema, 404: errorSchema }
+      response: { 200: extratoSchema, 403: errorSchema, 404: errorSchema }
     }
   }, async (request, reply) => {
     try {
+      const { sub, role } = request.user as { sub: string; role: string };
+      if (role === 'student' && sub !== request.params.studentId) {
+        return reply.status(403).send({ message: 'Acesso negado: voce so pode ver seu proprio extrato' });
+      }
       const data = await app.coinService.extratoAluno(request.params.studentId);
       return toExtratoResponse(data);
     } catch (error) {

@@ -18,7 +18,6 @@ const navByRole: Record<UserRole, NavItem[]> = {
     { to: '/alunos', label: 'Alunos', icon: GraduationCap },
     { to: '/professores', label: 'Professores', icon: BookOpen },
     { to: '/parceiros', label: 'Parceiros', icon: Building2 },
-    { to: '/moedas', label: 'Enviar Moedas', icon: Coins },
     { to: '/vantagens', label: 'Vantagens', icon: Gift },
     perfilItem
   ],
