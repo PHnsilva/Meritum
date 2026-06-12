@@ -1,0 +1,168 @@
+@startuml
+title Meritum - Diagrama de Sequencia Geral do Sistema
+
+skinparam sequenceMessageAlign center
+autonumber 1
+
+actor "Usuario\n(Admin/Aluno/Professor/Parceiro)" as U
+actor "Instituicao\nde Ensino" as IE
+boundary "Frontend\nReact/Vite" as FE
+control "Backend Fastify\nSistema de Gerenciamento" as SG
+control "Auth/RBAC\nJWT + perfis" as AUTH
+control "Servicos de\nAplicacao" as APP
+database "Prisma ORM\nPostgreSQL" as BD
+participant "Sistema de\nEmail" as SE
+participant "Armazenamento\nde Imagens" as IMG
+
+== Acesso e autenticacao ==
+
+U -> FE: acessar sistema
+FE --> U: exibir login, cadastro ou dashboard
+
+alt Cadastro de aluno ou parceiro
+    U -> FE: preencher dados cadastrais
+    FE -> SG: solicitar cadastro(dados)
+    SG -> APP: validar campos e duplicidade
+    APP -> BD: consultar usuario existente(email, cpf/cnpj)
+    BD --> APP: resultado verificacao
+
+    alt Dados invalidos ou duplicados
+        APP --> SG: rejeitar cadastro(motivo)
+        SG --> FE: erro de validacao
+        FE --> U: exibir orientacao de correcao
+    else Dados validos
+        APP -> APP: gerar hash de senha
+        APP -> BD: salvar usuario e perfil
+        BD --> APP: cadastro criado
+        APP --> SG: cadastro realizado
+        SG --> FE: confirmacao
+        FE --> U: exibir sucesso
+    end
+else Login de usuario existente
+    U -> FE: informar email e senha
+    FE -> SG: autenticar(email, senha)
+    SG -> AUTH: validar credenciais
+    AUTH -> BD: buscar usuario por email
+    BD --> AUTH: dados do usuario
+
+    alt Credenciais invalidas ou conta bloqueada
+        AUTH --> SG: autenticacao recusada
+        SG --> FE: erro de login
+        FE --> U: exibir erro generico
+    else Credenciais validas
+        AUTH -> AUTH: emitir JWT com perfil
+        AUTH --> SG: sessao autenticada
+        SG --> FE: token e dados do usuario
+        FE -> FE: armazenar sessao local
+        FE --> U: redirecionar dashboard por perfil
+    end
+end
+
+== Operacoes protegidas por perfil ==
+
+U -> FE: solicitar funcionalidade protegida
+FE -> SG: requisicao HTTP com JWT
+SG -> AUTH: autenticar token e verificar perfil
+
+alt Perfil nao autorizado
+    AUTH --> SG: acesso negado
+    SG --> FE: 403 Forbidden
+    FE --> U: exibir acesso negado
+else Perfil autorizado
+    AUTH --> SG: acesso permitido
+
+    alt Administrador gerencia cadastros
+        SG -> APP: criar/consultar/editar/remover instituicoes, alunos, professores ou parceiros
+        APP -> BD: persistir ou consultar dados cadastrais
+        BD --> APP: resultado da operacao
+        APP --> SG: resposta de cadastro
+        SG --> FE: dados atualizados
+        FE --> U: atualizar tela administrativa
+    else Professor envia moedas para aluno
+        U -> FE: informar aluno, quantidade e motivo
+        FE -> SG: enviarMoedas(professorID, alunoID, quantidade, motivo)
+        SG -> APP: validar mensagem, aluno e instituicao
+        APP -> BD: consultar aluno e saldo do professor
+        BD --> APP: dados aluno e saldo
+
+        alt Saldo insuficiente ou aluno invalido
+            APP --> SG: envio recusado(motivo)
+            SG --> FE: erro de envio
+            FE --> U: exibir motivo
+        else Envio valido
+            APP -> BD: debitar professor, creditar aluno e registrar transacao
+            BD --> APP: transacao registrada
+            APP ->> SE: notificar recebimento de moedas
+            SE -->> APP: confirmacao ou falha
+            APP --> SG: envio concluido
+            SG --> FE: confirmacao da transferencia
+            FE --> U: exibir sucesso
+        end
+    else Usuario consulta saldo ou extrato
+        SG -> APP: consultar saldo/extrato(usuarioID, perfil)
+        APP -> BD: buscar saldo e transacoes
+        BD --> APP: saldo e historico
+        APP --> SG: extrato formatado por perfil
+        SG --> FE: dados de saldo/extrato
+        FE --> U: exibir saldo e movimentacoes
+    else Parceiro cadastra vantagem
+        U -> FE: informar dados e imagem da vantagem
+        FE -> SG: cadastrarVantagem(dados, imagem)
+        SG -> APP: validar dados e formato da imagem
+        APP ->> IMG: salvar imagem
+        IMG -->> APP: URL da imagem
+        APP -> BD: salvar vantagem da empresa parceira
+        BD --> APP: vantagem criada
+        APP --> SG: cadastro de vantagem concluido
+        SG --> FE: confirmacao
+        FE --> U: exibir sucesso
+    else Aluno troca moedas por vantagem
+        U -> FE: selecionar vantagem e confirmar resgate
+        FE -> SG: trocarMoedas(alunoID, vantagemID)
+        SG -> APP: validar vantagem e saldo
+        APP -> BD: consultar vantagem, custo e saldo
+        BD --> APP: dados de resgate
+
+        alt Vantagem indisponivel ou saldo insuficiente
+            APP --> SG: resgate recusado(motivo)
+            SG --> FE: erro de resgate
+            FE --> U: exibir motivo
+        else Resgate valido
+            APP -> BD: debitar saldo do aluno
+            BD --> APP: saldo debitado
+
+            loop Ate gerar codigo unico
+                APP -> APP: gerar codigo de cupom
+                APP -> BD: verificar cupom existente(codigo)
+                BD --> APP: resultado de unicidade
+            end
+
+            APP -> BD: salvar resgate, cupom e transacao
+            BD --> APP: resgate registrado
+            APP ->> SE: enviar cupom ao aluno e aviso ao parceiro
+            SE -->> APP: confirmacao ou falha
+            APP --> SG: resgate concluido(codigo)
+            SG --> FE: dados do cupom
+            FE --> U: exibir confirmacao do resgate
+        end
+    end
+end
+
+== Credito semestral institucional ==
+
+IE -> SG: iniciarCreditoSemestral(semestreLetivo)
+SG -> APP: verificar inicio de semestre
+APP -> BD: listar professores vinculados
+BD --> APP: lista de professores
+
+loop Para cada professor vinculado
+    APP -> BD: consultar saldo atual
+    BD --> APP: saldo atual
+    APP -> BD: atualizar saldo com credito semestral
+    BD --> APP: saldo atualizado
+end
+
+APP --> SG: credito semestral concluido
+SG --> IE: resumo de creditos autorizados
+
+@enduml
