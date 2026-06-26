@@ -109,7 +109,8 @@ O Meritum é composto por duas aplicações separadas:
 - **@fastify/swagger** + **@fastify/swagger-ui**
 - **Prisma ORM**
 - **PostgreSQL**
-- **Nodemailer** — envio de e-mail para ativação de conta e troca de senha
+- **Resend** — envio de e-mail transacional via API HTTP (recomendado; funciona no Render, que bloqueia portas SMTP)
+- **Nodemailer** — fallback de envio por SMTP (dev local / hosts sem bloqueio de porta)
 - **dotenv**
 - **tsx** para desenvolvimento com watch
 - **Vitest** para testes de integração
@@ -371,10 +372,8 @@ DATABASE_URL="postgresql://admin:admin@localhost:5432/meritum?schema=public"
 PORT=3333
 HOST="0.0.0.0"
 JWT_SECRET="troque-em-producao"
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT=587
-SMTP_USER="seu-email@gmail.com"
-SMTP_PASS="sua-senha-de-app"
+RESEND_API_KEY="re_xxxxxxxxxxxx"
+MAIL_FROM="Meritum <onboarding@resend.dev>"
 FRONTEND_URL="http://localhost:5173"
 ```
 
@@ -384,11 +383,13 @@ FRONTEND_URL="http://localhost:5173"
 | `PORT` | Não | Porta HTTP do backend. Padrão: `3333`. |
 | `HOST` | Não | Host do Fastify. Padrão: `0.0.0.0`. |
 | `JWT_SECRET` | Sim | Segredo para assinar tokens JWT. |
-| `SMTP_HOST` | Sim | Servidor SMTP para envio de e-mails. |
+| `RESEND_API_KEY` | Não¹ | Chave da API do [Resend](https://resend.com). Provedor de e-mail recomendado (funciona no Render). |
+| `MAIL_FROM` | Não | Remetente dos e-mails. Com Resend, use um domínio verificado ou `Meritum <onboarding@resend.dev>` (teste). |
+| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` | Não¹ | Fallback SMTP (nodemailer), usado só se `RESEND_API_KEY` estiver vazio. Bloqueado no plano free do Render. |
 | `SMTP_PORT` | Não | Porta SMTP. Padrão: `587`. |
-| `SMTP_USER` | Sim | Usuário/e-mail da conta SMTP. |
-| `SMTP_PASS` | Sim | Senha ou App Password da conta SMTP. |
 | `FRONTEND_URL` | Não | URL base do frontend usada nos links de e-mail. |
+
+> ¹ Sem `RESEND_API_KEY` **e** sem credenciais SMTP, o app usa contas de teste **Ethereal**: nenhum e-mail real é entregue, apenas um link de preview é impresso no log.
 
 > **Atenção:** Nunca comite o arquivo `.env` com credenciais reais. O `.gitignore` já o exclui.
 
@@ -415,7 +416,7 @@ VITE_API_URL=http://localhost:3333
 #### Pré-requisitos
 
 - Docker e Docker Compose instalados.
-- Arquivo `Codigo/Backend/.env` configurado com `JWT_SECRET` e credenciais SMTP.
+- Arquivo `Codigo/Backend/.env` configurado com `JWT_SECRET` (e, opcionalmente, `RESEND_API_KEY` para envio de e-mail).
 
 #### Subir todos os serviços
 
@@ -459,7 +460,7 @@ docker compose down -v
 ```bash
 cd Codigo/Backend
 cp .env.example .env
-# edite .env com JWT_SECRET e credenciais SMTP
+# edite .env com JWT_SECRET (e RESEND_API_KEY para envio de e-mail; opcional)
 npm install
 npm run prisma:migrate
 npm run prisma:seed
@@ -698,7 +699,7 @@ As telas estão em `Artefatos/telas/`.
 - Usar HTTPS no deploy.
 - Configurar CORS com origens explícitas.
 - Adicionar logs de auditoria para operações críticas.
-- Rotacionar `JWT_SECRET` e credenciais SMTP periodicamente.
+- Rotacionar `JWT_SECRET` e a chave do provedor de e-mail (`RESEND_API_KEY` / credenciais SMTP) periodicamente.
 
 ---
 
