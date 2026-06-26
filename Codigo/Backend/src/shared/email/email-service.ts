@@ -256,18 +256,67 @@ function buildStudentWelcomeHtml(studentName: string, institutionName: string): 
 </html>`;
 }
 
-async function sendWithNodemailer(opts: {
+type EmailAttachment = {
+  filename: string;
+  content: Buffer;
+  /** Referenciado no HTML via cid:<contentId> para imagens embutidas (ex.: QR code). */
+  contentId?: string;
+};
+
+type SendEmailOptions = {
   to: string;
   subject: string;
   html: string;
-}): Promise<void> {
+  attachments?: EmailAttachment[];
+};
+
+function resolveFrom(): string {
+  return process.env['MAIL_FROM'] ?? process.env['SMTP_FROM'] ?? 'Meritum <onboarding@resend.dev>';
+}
+
+/**
+ * Envia e-mail escolhendo o provedor pela variável de ambiente, nesta ordem:
+ *   1. RESEND_API_KEY       -> Resend (HTTP na porta 443; funciona no Render, que bloqueia as portas SMTP 25/465/587).
+ *   2. SMTP_HOST/USER/PASS  -> nodemailer via SMTP (dev local ou hosts sem bloqueio de porta).
+ *   3. nenhum dos dois      -> Ethereal (conta de teste; NÃO entrega e-mail real, apenas gera link de preview).
+ */
+async function sendEmail(opts: SendEmailOptions): Promise<void> {
+  const from = resolveFrom();
+  const resendApiKey = process.env['RESEND_API_KEY'];
+
+  if (resendApiKey) {
+    const { Resend } = await import('resend');
+    const resend = new Resend(resendApiKey);
+    const { data, error } = await resend.emails.send({
+      from,
+      to: opts.to,
+      subject: opts.subject,
+      html: opts.html,
+      attachments: opts.attachments?.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentId: a.contentId
+      }))
+    });
+    if (error) {
+      throw new Error(`[Resend] ${error.name}: ${error.message}`);
+    }
+    console.log(`[email] Enviado via Resend para ${opts.to} | assunto: ${opts.subject} | id: ${data?.id}`);
+    return;
+  }
+
   const host = process.env['SMTP_HOST'];
   const user = process.env['SMTP_USER'];
   const pass = process.env['SMTP_PASS'];
-  const from = process.env['SMTP_FROM'] ?? 'meritum@sistema.com';
   const port = Number(process.env['SMTP_PORT'] ?? 587);
 
   const nodemailer = await import('nodemailer');
+  // nodemailer usa "cid" no lugar de "contentId" para imagens embutidas.
+  const attachments = opts.attachments?.map((a) => ({
+    filename: a.filename,
+    content: a.content,
+    cid: a.contentId
+  }));
 
   if (!host || !user || !pass) {
     // Ethereal: SMTP de teste — cria conta automaticamente e gera link de preview
@@ -277,7 +326,7 @@ async function sendWithNodemailer(opts: {
       port: 587,
       auth: { user: testAccount.user, pass: testAccount.pass }
     });
-    const info = await transporter.sendMail({ from, to: opts.to, subject: opts.subject, html: opts.html });
+    const info = await transporter.sendMail({ from, to: opts.to, subject: opts.subject, html: opts.html, attachments });
     console.log('[email] Enviado via Ethereal (teste):');
     console.log('  Para:', opts.to);
     console.log('  Assunto:', opts.subject);
@@ -286,8 +335,8 @@ async function sendWithNodemailer(opts: {
   }
 
   const transporter = nodemailer.default.createTransport({ host, port, auth: { user, pass } });
-  const info = await transporter.sendMail({ from, to: opts.to, subject: opts.subject, html: opts.html });
-  console.log(`[email] Enviado via SMTP real (${host}:${port}) para ${opts.to} | assunto: ${opts.subject} | messageId: ${info.messageId}`);
+  const info = await transporter.sendMail({ from, to: opts.to, subject: opts.subject, html: opts.html, attachments });
+  console.log(`[email] Enviado via SMTP (${host}:${port}) para ${opts.to} | assunto: ${opts.subject} | messageId: ${info.messageId}`);
 }
 
 export async function sendStudentCouponEmail(studentEmail: string, studentName: string, advantageTitle: string, partnerName: string, coinCost: number, code: string): Promise<void> {
@@ -297,38 +346,11 @@ export async function sendStudentCouponEmail(studentEmail: string, studentName: 
       margin: 1,
       color: { dark: '#000000', light: '#ffffff' }
     });
-
-    const nodemailer = await import('nodemailer');
-    const host = process.env['SMTP_HOST'];
-    const user = process.env['SMTP_USER'];
-    const pass = process.env['SMTP_PASS'];
-    const from = process.env['SMTP_FROM'] ?? 'meritum@sistema.com';
-    const port = Number(process.env['SMTP_PORT'] ?? 587);
-
-    let transporter: any;
-    if (!host || !user || !pass) {
-      const testAccount = await nodemailer.default.createTestAccount();
-      transporter = nodemailer.default.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        auth: { user: testAccount.user, pass: testAccount.pass }
-      });
-    } else {
-      transporter = nodemailer.default.createTransport({ host, port, auth: { user, pass } });
-    }
-
-    await transporter.sendMail({
-      from,
+    await sendEmail({
       to: studentEmail,
       subject: `Meritum: cupom de resgate — ${advantageTitle}`,
       html: buildStudentCouponHtml(studentName, advantageTitle, partnerName, coinCost, code),
-      attachments: [
-        {
-          filename: 'qrcode.png',
-          content: qrCodeBuffer,
-          cid: 'qrcode-student'
-        }
-      ]
+      attachments: [{ filename: 'qrcode.png', content: qrCodeBuffer, contentId: 'qrcode-student' }]
     });
   } catch (err) {
     console.error('[email] Falha ao enviar cupom ao aluno:', err);
@@ -342,38 +364,11 @@ export async function sendPartnerRedemptionEmail(partnerEmail: string, partnerNa
       margin: 1,
       color: { dark: '#000000', light: '#ffffff' }
     });
-
-    const nodemailer = await import('nodemailer');
-    const host = process.env['SMTP_HOST'];
-    const user = process.env['SMTP_USER'];
-    const pass = process.env['SMTP_PASS'];
-    const from = process.env['SMTP_FROM'] ?? 'meritum@sistema.com';
-    const port = Number(process.env['SMTP_PORT'] ?? 587);
-
-    let transporter: any;
-    if (!host || !user || !pass) {
-      const testAccount = await nodemailer.default.createTestAccount();
-      transporter = nodemailer.default.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        auth: { user: testAccount.user, pass: testAccount.pass }
-      });
-    } else {
-      transporter = nodemailer.default.createTransport({ host, port, auth: { user, pass } });
-    }
-
-    await transporter.sendMail({
-      from,
+    await sendEmail({
       to: partnerEmail,
       subject: `Meritum: nova troca — ${advantageTitle}`,
       html: buildPartnerRedemptionHtml(partnerName, studentName, advantageTitle, coinCost, code),
-      attachments: [
-        {
-          filename: 'qrcode.png',
-          content: qrCodeBuffer,
-          cid: 'qrcode-partner'
-        }
-      ]
+      attachments: [{ filename: 'qrcode.png', content: qrCodeBuffer, contentId: 'qrcode-partner' }]
     });
   } catch (err) {
     console.error('[email] Falha ao notificar parceiro da troca:', err);
@@ -382,7 +377,7 @@ export async function sendPartnerRedemptionEmail(partnerEmail: string, partnerNa
 
 export async function sendCoinReceivedEmail(params: SendCoinEmailParams): Promise<void> {
   try {
-    await sendWithNodemailer({
+    await sendEmail({
       to: params.studentEmail,
       subject: `Meritum: voce recebeu ${params.amount} moedas!`,
       html: buildStudentReceiveHtml(params)
@@ -394,7 +389,7 @@ export async function sendCoinReceivedEmail(params: SendCoinEmailParams): Promis
 
 export async function sendProfessorActivationEmail(professorEmail: string, professorName: string, tempPassword: string): Promise<void> {
   try {
-    await sendWithNodemailer({
+    await sendEmail({
       to: professorEmail,
       subject: 'Meritum: ative sua conta de professor',
       html: buildProfessorActivationHtml(professorName, tempPassword)
@@ -406,7 +401,7 @@ export async function sendProfessorActivationEmail(professorEmail: string, profe
 
 export async function sendPartnerRegistrationEmail(partnerEmail: string, partnerName: string): Promise<void> {
   try {
-    await sendWithNodemailer({
+    await sendEmail({
       to: partnerEmail,
       subject: 'Meritum: solicitacao de cadastro recebida',
       html: buildPartnerRegistrationHtml(partnerName)
@@ -418,7 +413,7 @@ export async function sendPartnerRegistrationEmail(partnerEmail: string, partner
 
 export async function sendPartnerApprovalEmail(partnerEmail: string, partnerName: string): Promise<void> {
   try {
-    await sendWithNodemailer({
+    await sendEmail({
       to: partnerEmail,
       subject: 'Meritum: sua conta de empresa parceira foi aprovada',
       html: buildPartnerApprovalHtml(partnerName)
@@ -430,7 +425,7 @@ export async function sendPartnerApprovalEmail(partnerEmail: string, partnerName
 
 export async function sendInstitutionRegistrationEmail(email: string, name: string): Promise<void> {
   try {
-    await sendWithNodemailer({
+    await sendEmail({
       to: email,
       subject: 'Meritum: solicitacao de cadastro recebida',
       html: buildInstitutionRegistrationHtml(name)
@@ -442,7 +437,7 @@ export async function sendInstitutionRegistrationEmail(email: string, name: stri
 
 export async function sendInstitutionApprovalEmail(email: string, name: string): Promise<void> {
   try {
-    await sendWithNodemailer({
+    await sendEmail({
       to: email,
       subject: 'Meritum: sua conta de instituicao foi aprovada',
       html: buildInstitutionApprovalHtml(name)
@@ -454,7 +449,7 @@ export async function sendInstitutionApprovalEmail(email: string, name: string):
 
 export async function sendCoinSentConfirmationEmail(params: ProfessorSentEmailParams): Promise<void> {
   try {
-    await sendWithNodemailer({
+    await sendEmail({
       to: params.professorEmail,
       subject: `Meritum: envio de ${params.amount} moedas confirmado`,
       html: buildProfessorSentHtml(params)
@@ -466,7 +461,7 @@ export async function sendCoinSentConfirmationEmail(params: ProfessorSentEmailPa
 
 export async function sendStudentWelcomeEmail(studentEmail: string, studentName: string, institutionName: string): Promise<void> {
   try {
-    await sendWithNodemailer({
+    await sendEmail({
       to: studentEmail,
       subject: 'Meritum: bem-vindo ao sistema!',
       html: buildStudentWelcomeHtml(studentName, institutionName)

@@ -36,8 +36,15 @@ services:
       # --- Opcionais ---
       - key: RABBITMQ_URL
         sync: false                  # deixe vazio no plano free (consumers exigem serviço sempre-ligado); use CloudAMQP no plano pago
+      # --- E-mail transacional ---
+      # ATENÇÃO: o Render bloqueia as portas SMTP (25/465/587) no plano free. Use o Resend (API HTTP/443).
+      - key: RESEND_API_KEY
+        sync: false                  # crie em https://resend.com/api-keys; sem ela o app usa Ethereal (não entrega e-mail real)
+      - key: MAIL_FROM
+        sync: false                  # remetente; com Resend use um domínio verificado ou "Meritum <onboarding@resend.dev>" p/ teste
+      # SMTP abaixo é fallback (só funciona em plano pago/fora do Render); deixe vazio ao usar Resend.
       - key: SMTP_HOST
-        sync: false                  # sem SMTP_HOST/USER/PASS o app usa contas de teste Ethereal (não entrega e-mail real)
+        sync: false
       - key: SMTP_USER
         sync: false
       - key: SMTP_PASS
