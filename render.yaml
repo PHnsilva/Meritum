@@ -1,0 +1,50 @@
+# Render Blueprint — Backend Meritum (Fastify + Prisma + PostgreSQL)
+# Docs: https://render.com/docs/blueprint-spec
+#
+# O frontend NÃO entra aqui: ele é hospedado no Vercel (veja Codigo/Frontend/vercel.json).
+# Este blueprint sobe a API + um PostgreSQL gerenciado a partir do Dockerfile existente.
+
+services:
+  - type: web
+    name: meritum-backend
+    runtime: docker
+    rootDir: Codigo/Backend          # contexto do build = pasta do Dockerfile
+    dockerfilePath: ./Dockerfile     # entrypoint.sh roda "prisma migrate deploy" e depois "npm run start"
+    plan: free                       # TROQUE para "starter" em produção: o plano free dorme após 15 min de inatividade
+    region: oregon                   # ajuste para a região mais próxima (ex.: ohio, frankfurt, singapore)
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3333"
+      - key: JWT_SECRET
+        generateValue: true          # Render gera um segredo forte automaticamente
+      - key: DATABASE_URL
+        fromDatabase:
+          name: meritum-db
+          property: connectionString
+      - key: FRONTEND_URL
+        sync: false                  # preencha no painel com a URL do Vercel (ex.: https://meritum.vercel.app)
+      - key: CORS_ORIGINS
+        sync: false                  # OBRIGATÓRIO: URL(s) do frontend permitidas, separadas por vírgula (ex.: https://meritum.vercel.app)
+      # --- Opcionais ---
+      - key: RABBITMQ_URL
+        sync: false                  # deixe vazio no plano free (consumers exigem serviço sempre-ligado); use CloudAMQP no plano pago
+      - key: SMTP_HOST
+        sync: false                  # sem SMTP_HOST/USER/PASS o app usa contas de teste Ethereal (não entrega e-mail real)
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+
+databases:
+  - name: meritum-db
+    plan: free                       # ATENÇÃO: Postgres free do Render expira após ~30 dias. Para produção use plano pago ou Neon/Supabase (preencha DATABASE_URL manualmente).
+    databaseName: meritum
+    user: meritum

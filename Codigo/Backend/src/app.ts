@@ -180,7 +180,14 @@ export async function buildApp() {
   await configureEventTransport(app);
   await registerEventHandlers();
 
-  await app.register(cors, { origin: true });
+  const corsOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)
+    : ['http://localhost:5173', 'http://localhost:4173'];
+
+  await app.register(cors, {
+    origin: corsOrigins,
+    credentials: true,
+  });
 
   await app.register(rateLimit, {
     global: true,
