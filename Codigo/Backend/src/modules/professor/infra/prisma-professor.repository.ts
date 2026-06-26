@@ -91,7 +91,11 @@ export class PrismaProfessorRepository implements ProfessorRepository {
   }
 
   async findActivationUser(email: string): Promise<ActivationUserView | null> {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    // Busca case-insensitive + trim: o professor pode digitar o email com
+    // maiúsculas ou espaços diferentes de como foi cadastrado.
+    const user = await this.prisma.user.findFirst({
+      where: { email: { equals: email.trim(), mode: 'insensitive' } }
+    });
     if (!user || user.role !== 'PROFESSOR') return null;
     return { id: user.id, name: user.name, email: user.email };
   }

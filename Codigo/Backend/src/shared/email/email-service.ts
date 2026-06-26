@@ -286,7 +286,8 @@ async function sendWithNodemailer(opts: {
   }
 
   const transporter = nodemailer.default.createTransport({ host, port, auth: { user, pass } });
-  await transporter.sendMail({ from, to: opts.to, subject: opts.subject, html: opts.html });
+  const info = await transporter.sendMail({ from, to: opts.to, subject: opts.subject, html: opts.html });
+  console.log(`[email] Enviado via SMTP real (${host}:${port}) para ${opts.to} | assunto: ${opts.subject} | messageId: ${info.messageId}`);
 }
 
 export async function sendStudentCouponEmail(studentEmail: string, studentName: string, advantageTitle: string, partnerName: string, coinCost: number, code: string): Promise<void> {

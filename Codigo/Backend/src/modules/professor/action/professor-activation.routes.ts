@@ -22,7 +22,10 @@ export async function professorActivationRoutes(app: FastifyInstance) {
 
     // Dispara evento apenas se professor existir — nunca vaza a existência do email
     if (result) {
+      request.log.info(`[ativacao] professor encontrado para ${result.userEmail} — publicando evento de ativacao`);
       eventBus.publish(new ProfessorAtivacaoSolicitadaEvent(result.userEmail, result.userName, result.tempPassword));
+    } else {
+      request.log.warn(`[ativacao] NENHUM professor encontrado com o email "${request.body.email}" — nada sera enviado`);
     }
 
     return { message: 'Se o email estiver cadastrado, voce recebera a senha temporaria em instantes.' };
