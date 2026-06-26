@@ -1,0 +1,57 @@
+@startuml
+!pragma layout smetana
+title Meritum — Diagrama UML de Implantação
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle rectangle
+skinparam linetype ortho
+skinparam nodesep 65
+skinparam ranksep 65
+skinparam node {
+  BackgroundColor #F8FAFC
+  BorderColor #334155
+  FontColor #111827
+}
+skinparam cloud {
+  BackgroundColor #F8FAFC
+  BorderColor #64748B
+}
+skinparam database {
+  BackgroundColor #EFF6FF
+  BorderColor #2563EB
+}
+skinparam artifact {
+  BackgroundColor #FFF7ED
+  BorderColor #F97316
+}
+top to bottom direction
+actor "Usuário\nAdmin / Professor / Aluno /\nParceiro / Instituição" as User
+node "Dispositivo do usuário" as Device {
+  artifact "Navegador Web" as Browser
+}
+node "Vercel\nFrontend Hosting" as Vercel {
+  artifact "SPA Meritum\nReact 19 + Vite 7\nbuild: dist/" as Frontend
+}
+node "Render Web Service\nmeritum-backend" as Render {
+ artifact "API Meritum\nNode.js + Fastify\nContainer Docker\nporta 3333" as Backend
+ artifact "Monólito modular ADR\nJWT, RBAC, CORS, rate-limit\nPrisma Client + Swagger /docs" as Runtime
+}
+database "Render PostgreSQL\nmeritum-db" as Postgres
+folder "Segredos de runtime" as Secrets {
+  artifact "DATABASE_URL\nJWT_SECRET\nFRONTEND_URL / CORS_ORIGINS\nADMIN_PASSWORD\nSMTP_*\nRABBITMQ_URL opcional" as EnvVars
+}
+cloud "Serviços externos opcionais" as External {
+ queue "RabbitMQ / CloudAMQP\nDomain events + DLQ" as Rabbit
+ cloud "SMTP transacional\nNodemailer" as SMTP
+ cloud "NewsAPI.org\nnotícias de educação" as NewsAPI
+}
+User --> Browser : usa sistema
+Browser --> Frontend : HTTPS\nassets SPA
+Frontend --> Backend : HTTPS/JSON\nBearer JWT
+Backend --> Postgres : PostgreSQL/TLS\nPrisma
+Backend --> Rabbit : AMQP/AMQPS
+Backend --> SMTP : SMTP 587
+Backend --> NewsAPI : HTTPS
+Secrets ..> Backend : env vars
+@enduml

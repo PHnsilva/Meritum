@@ -1,0 +1,65 @@
+@startuml
+' Meritum — Diagrama UML de Comunicação
+' Cenário: UC05 - Professor envia moedas para aluno.
+' Fontes: README.md; coin.routes.ts; coin-service.ts; moedaService.ts; schema.prisma.
+
+!pragma layout smetana
+
+title Meritum — Diagrama UML de Comunicação — UC05 Enviar Moedas
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 60
+skinparam maxMessageSize 40
+skinparam object {
+  BackgroundColor #F8FAFC
+  BorderColor #334155
+  FontColor #111827
+}
+
+top to bottom direction
+
+object "professor:\nProfessor" as Professor
+object "page:\nEnviarMoedasPage" as Page
+object "apiClient:\nHTTP client" as ApiClient
+object "action:\nCoinRoutes" as Action
+object "guard:\nJWT + RBAC" as Guard
+object "service:\nCoinService" as CoinService
+object "persistence:\nPrisma repositories\n+ UnitOfWork" as Persistence
+object "db:\nPostgreSQL meritum" as DB <<database>>
+object "eventBus:\nDomain Events" as EventBus
+object "email:\nEmailService" as Email
+object "smtp:\nSMTP/Ethereal" as SMTP
+
+Professor -right- Page : 1. preencher envio
+Page -right- ApiClient : 2. enviarMoedas(input)
+ApiClient -right- Action : 2.1 POST + JWT
+Action -down- Guard : 2.2 autenticar\n+ role professor
+Guard -right- CoinService : 3. enviarMoedas(dto)
+
+CoinService -down- Persistence : 3.1 buscar professor\ne aluno
+Persistence -down- DB : 3.2 SELECT users,\nprofessors, students
+CoinService -right- CoinService : 3.3 validar regras\nde domínio
+
+CoinService -down- Persistence : 4. transação Prisma\ndeduzir, creditar, registrar
+Persistence -down- DB : 4.1 UPDATE/INSERT\nCOMMIT
+
+CoinService -right- EventBus : 5. publicar evento
+EventBus -down- Email : 5.1 notificar aluno
+Email -down- SMTP : 5.2 enviar e-mail
+
+CoinService -up- Action : 6. transação criada
+Action -up- ApiClient : 6.1 201 JSON
+ApiClient -up- Page : 6.2 retorno
+Page -up- Professor : 7. confirmação
+
+note bottom of CoinService
+  Comunicação de um cenário. Não representa todos os módulos.
+  A persistência agrupa ProfessorBalancePort, StudentBalancePort,
+  TransactionRepository e UnitOfWork observados no código.
+end note
+
+@enduml
