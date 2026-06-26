@@ -29,6 +29,10 @@ services:
         sync: false                  # preencha no painel com a URL do Vercel (ex.: https://meritum.vercel.app)
       - key: CORS_ORIGINS
         sync: false                  # OBRIGATÓRIO: URL(s) do frontend permitidas, separadas por vírgula (ex.: https://meritum.vercel.app)
+      - key: ADMIN_EMAIL
+        value: admin@meritum.com     # e-mail de login do admin criado no seed
+      - key: ADMIN_PASSWORD
+        sync: false                  # OBRIGATÓRIO p/ criar o admin em produção: defina uma senha FORTE no painel
       # --- Opcionais ---
       - key: RABBITMQ_URL
         sync: false                  # deixe vazio no plano free (consumers exigem serviço sempre-ligado); use CloudAMQP no plano pago
