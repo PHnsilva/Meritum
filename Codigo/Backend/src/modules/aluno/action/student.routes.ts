@@ -1,8 +1,9 @@
-﻿import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { CreateStudentInput, UpdateStudentInput } from '../application/student-service.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
 import { toStudentListResponse, toStudentResponse } from '../responder/student-responder.js';
+import { errorSchema, paginatedSchema } from '../../../shared/http/route-schemas.js';
 
 const studentResponseSchema = {
   type: 'object',
@@ -48,18 +49,7 @@ const updateStudentBodySchema = {
   properties: studentBodySchema.properties
 } as const;
 
-const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
-
-const paginatedStudentSchema = {
-  type: 'object',
-  properties: {
-    data: { type: 'array', items: studentResponseSchema },
-    total: { type: 'integer' },
-    page: { type: 'integer' },
-    limit: { type: 'integer' },
-    totalPages: { type: 'integer' }
-  }
-} as const;
+const paginatedStudentSchema = paginatedSchema(studentResponseSchema);
 
 export async function studentRoutes(app: FastifyInstance) {
 

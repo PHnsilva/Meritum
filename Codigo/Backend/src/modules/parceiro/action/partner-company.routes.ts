@@ -1,8 +1,9 @@
-﻿import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { CreatePartnerCompanyInput, RegisterPartnerCompanyInput, UpdatePartnerCompanyInput } from '../application/partner-company-service.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
 import { toPartnerCompanyListResponse, toPartnerCompanyResponse } from '../responder/partner-company-responder.js';
+import { errorSchema, paginatedSchema } from '../../../shared/http/route-schemas.js';
 
 const partnerCompanyResponseSchema = {
   type: 'object',
@@ -38,18 +39,7 @@ const updatePartnerCompanyBodySchema = {
   properties: partnerCompanyBodySchema.properties
 } as const;
 
-const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
-
-const paginatedPartnerSchema = {
-  type: 'object',
-  properties: {
-    data: { type: 'array', items: partnerCompanyResponseSchema },
-    total: { type: 'integer' },
-    page: { type: 'integer' },
-    limit: { type: 'integer' },
-    totalPages: { type: 'integer' }
-  }
-} as const;
+const paginatedPartnerSchema = paginatedSchema(partnerCompanyResponseSchema);
 
 export async function partnerCompanyRoutes(app: FastifyInstance) {
 

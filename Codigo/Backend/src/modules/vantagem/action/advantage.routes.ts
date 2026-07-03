@@ -1,8 +1,9 @@
-﻿import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { CreateAdvantageInput, UpdateAdvantageInput } from '../application/advantage-service.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { toAdvantageListResponse, toAdvantageResponse, toRedemptionResponse } from '../responder/advantage-responder.js';
+import { errorSchema } from '../../../shared/http/route-schemas.js';
 
 const advantageSchema = {
   type: 'object',
@@ -41,8 +42,6 @@ const bodySchema = {
     costInCoins: { type: 'integer', minimum: 1 }
   }
 } as const;
-
-const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
 export async function advantageRoutes(app: FastifyInstance) {
 

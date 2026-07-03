@@ -1,8 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { eventBus } from '../../../shared/domain/events/event-bus.js';
 import { ProfessorAtivacaoSolicitadaEvent } from '../../../shared/domain/events/professor-ativacao-solicitada-event.js';
-
-const messageSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
+import { messageSchema } from '../../../shared/http/route-schemas.js';
 
 export async function professorActivationRoutes(app: FastifyInstance) {
   app.post<{ Body: { email: string } }>('/api/professores/ativar', {

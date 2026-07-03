@@ -1,8 +1,9 @@
-﻿import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { CreateProfessorInput, UpdateProfessorInput } from '../application/professor-service.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
 import { toProfessorListResponse, toProfessorResponse } from '../responder/professor-responder.js';
+import { errorSchema, paginatedSchema } from '../../../shared/http/route-schemas.js';
 
 const professorResponseSchema = {
   type: 'object',
@@ -43,18 +44,7 @@ const updateProfessorBodySchema = {
   properties: professorBodySchema.properties
 } as const;
 
-const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
-
-const paginatedProfessorSchema = {
-  type: 'object',
-  properties: {
-    data: { type: 'array', items: professorResponseSchema },
-    total: { type: 'integer' },
-    page: { type: 'integer' },
-    limit: { type: 'integer' },
-    totalPages: { type: 'integer' }
-  }
-} as const;
+const paginatedProfessorSchema = paginatedSchema(professorResponseSchema);
 
 export async function professorRoutes(app: FastifyInstance) {
 

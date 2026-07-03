@@ -4,6 +4,7 @@ import { sendErrorResponse } from '../../../shared/responder/error-responder.js'
 import { requireRole } from '../../../shared/auth/require-role.js';
 
 import { toInstitutionListResponse, toInstitutionResponse } from '../responder/institution-responder.js';
+import { errorSchema, messageSchema, paginatedSchema } from '../../../shared/http/route-schemas.js';
 
 const institutionResponseSchema = {
   type: 'object',
@@ -17,19 +18,7 @@ const institutionResponseSchema = {
   }
 } as const;
 
-const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
-const messageSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
-
-const paginatedInstitutionSchema = {
-  type: 'object',
-  properties: {
-    data: { type: 'array', items: institutionResponseSchema },
-    total: { type: 'integer' },
-    page: { type: 'integer' },
-    limit: { type: 'integer' },
-    totalPages: { type: 'integer' }
-  }
-} as const;
+const paginatedInstitutionSchema = paginatedSchema(institutionResponseSchema);
 
 export async function institutionRoutes(app: FastifyInstance) {
 
