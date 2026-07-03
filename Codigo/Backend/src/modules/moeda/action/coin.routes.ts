@@ -4,6 +4,7 @@ import { sendErrorResponse } from '../../../shared/responder/error-responder.js'
 import { requireRole } from '../../../shared/auth/require-role.js';
 
 import { toExtratoResponse, toTransactionResponse } from '../responder/coin-responder.js';
+import { errorSchema } from '../../../shared/http/route-schemas.js';
 
 const transactionSchema = {
   type: 'object',
@@ -42,8 +43,6 @@ const extratoSchema = {
     transactions: { type: 'array', items: transactionSchema }
   }
 } as const;
-
-const errorSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 
 export async function coinRoutes(app: FastifyInstance) {
 

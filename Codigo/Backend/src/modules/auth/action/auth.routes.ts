@@ -1,8 +1,9 @@
-﻿import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { LoginInput, UpdatePerfilInput, ChangePasswordInput } from '../application/auth-service.js';
 import { toAuthUserResponse } from '../responder/auth-responder.js';
 import { sendErrorResponse } from '../../../shared/responder/error-responder.js';
 import { requireRole } from '../../../shared/auth/require-role.js';
+import { messageSchema } from '../../../shared/http/route-schemas.js';
 
 const authUserSchema = {
   type: 'object',
@@ -24,7 +25,6 @@ const authUserSchema = {
   }
 } as const;
 
-const messageSchema = { type: 'object', properties: { message: { type: 'string' } } } as const;
 const tokenSchema = { type: 'object', properties: { token: { type: 'string' } } } as const;
 
 type PerfilBody = { entityId: string } & UpdatePerfilInput;
