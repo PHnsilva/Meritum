@@ -1,11 +1,12 @@
 import { Edit3, FileText, Plus, RefreshCw, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert } from '../../../shared/components/Alert';
 import { Button } from '../../../shared/components/Button';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { PageHeader } from '../../../shared/components/PageHeader';
 import { SearchInput } from '../../../shared/components/SearchInput';
+import { useResourceList } from '../../../shared/hooks/useResourceList';
 import { formatCpf } from '../../../shared/utils/formatters';
 import { getStoredUser } from '../../auth/services/authService';
 import { deleteAluno, listAlunos } from '../services/alunoService';
@@ -15,37 +16,21 @@ export function AlunoListPage() {
   const user = getStoredUser();
   const isInstitution = user?.role === 'institution';
 
-  const [alunos, setAlunos] = useState<Aluno[]>([]);
   const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-
-  async function loadAlunos() {
-    setLoading(true);
-    setError('');
-    try {
-      setAlunos(await listAlunos(isInstitution ? (user?.id ?? undefined) : undefined));
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Nao foi possivel carregar alunos');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleDeleteConfirmed() {
-    if (!confirmDeleteId) return;
-    const id = confirmDeleteId;
-    setConfirmDeleteId(null);
-    try {
-      await deleteAluno(id);
-      await loadAlunos();
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Nao foi possivel remover o aluno');
-    }
-  }
-
-  useEffect(() => { void loadAlunos(); }, []);
+  const {
+    items: alunos,
+    loading,
+    error,
+    load: loadAlunos,
+    confirmDeleteId,
+    setConfirmDeleteId,
+    handleDeleteConfirmed
+  } = useResourceList<Aluno>({
+    fetcher: () => listAlunos(isInstitution ? (user?.id ?? undefined) : undefined),
+    remover: deleteAluno,
+    loadErrorMessage: 'Nao foi possivel carregar alunos',
+    deleteErrorMessage: 'Nao foi possivel remover o aluno'
+  });
 
   const q = query.toLowerCase();
   const filtered = alunos.filter(
