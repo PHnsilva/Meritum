@@ -1,93 +1,44 @@
 # Meritum Backend
 
-Backend Node.js configurado com Fastify, Prisma, PostgreSQL e Swagger.
+API TypeScript/Fastify com Prisma, PostgreSQL, JWT e módulos de cadastros, moedas, vantagens e resgates.
 
-## Stack
+## Execução
 
-- Node.js
-- TypeScript
-- Fastify
-- Prisma ORM
-- PostgreSQL
-- Swagger/OpenAPI
-
-## Configuracao do banco local
-
-O projeto espera um PostgreSQL local com:
-
-```env
-DATABASE_URL="postgresql://admin:admin@localhost:5432/meritum?schema=public"
-```
-
-Banco: `meritum`
-Usuario: `admin`
-Senha: `admin`
-
-## Configuracao do RabbitMQ
-
-O RabbitMQ e opcional em desenvolvimento local. Quando `RABBITMQ_URL` estiver
-configurada, os eventos de dominio do backend passam pela fila; sem essa variavel,
-o backend usa o barramento em memoria.
-
-```env
-RABBITMQ_URL="amqp://meritum:meritum@localhost:5672"
-RABBITMQ_EXCHANGE="meritum.domain-events"
-RABBITMQ_QUEUE_PREFIX="meritum"
-```
-
-No `docker-compose.yml` da raiz, o RabbitMQ ja sobe com painel de administracao em
-`http://localhost:15672` usando usuario `meritum` e senha `meritum`.
-Mensagens que falharem no processamento sao encaminhadas para filas dead-letter
-com sufixo `.dead-letter`.
-
-## Instalacao
+Requisitos: Node.js 22.12 ou superior na série 22 e PostgreSQL. RabbitMQ é opcional. A partir da raiz do clone, copie `.env.example` deste diretório para `.env` e preencha os valores.
 
 ```bash
-npm install
-```
-
-## Gerar Prisma Client
-
-```bash
+cd Codigo/Backend
+npm ci
 npm run prisma:generate
-```
-
-## Criar/aplicar migrations
-
-```bash
-npm run prisma:migrate -- --name init
-```
-
-## Rodar em desenvolvimento
-
-```bash
+npx prisma migrate deploy
+npm run prisma:seed
 npm run dev
 ```
 
-## URLs
+Configure `ADMIN_PASSWORD` com um valor não vazio para o seed criar o administrador. Uma conta existente não tem a senha alterada pelo seed. Deixe `RABBITMQ_URL` vazia para desenvolvimento sem broker; se preenchida, a conexão é exigida na inicialização.
 
-- API: `http://localhost:3333`
-- Health check: `http://localhost:3333/health`
-- Swagger: `http://localhost:3333/docs`
+## Endereços e contrato
 
-## Rotas
+- API: `http://localhost:3333`.
+- Health: `GET /health`.
+- Swagger: `/docs`.
+- Login: `POST /api/auth/login`.
+- Recursos: `/api/instituicoes`, `/api/alunos`, `/api/professores`, `/api/parceiros`, `/api/moedas`, `/api/vantagens` e `/api/resgates`.
 
-- `GET /health`
-- `GET /users`
-- `POST /users`
-- `POST /users/login`
-- `GET /api/instituicoes`
-- `GET /api/instituicoes/:id`
-- `POST /api/instituicoes`
-- `PUT /api/instituicoes/:id`
-- `DELETE /api/instituicoes/:id`
-- `GET /api/alunos`
-- `GET /api/alunos/:id`
-- `POST /api/alunos`
-- `PUT /api/alunos/:id`
-- `DELETE /api/alunos/:id`
-- `GET /api/parceiros`
-- `GET /api/parceiros/:id`
-- `POST /api/parceiros`
-- `PUT /api/parceiros/:id`
-- `DELETE /api/parceiros/:id`
+As antigas rotas `/users` e `/users/login` não estão registradas. Consulte os métodos efetivos no Swagger e nas rotas de cada módulo.
+
+## Configuração e eventos
+
+O [README principal](../../README.md#configuração) detalha banco, JWT, CORS, seed e e-mail. O transporte usa `RABBITMQ_URL`, `RABBITMQ_EXCHANGE` e `RABBITMQ_QUEUE_PREFIX`. Sem broker, os eventos são locais e não duráveis; com broker, há filas duráveis e dead-letter. A publicação não compõe a transação Prisma e não garante entrega única de e-mail.
+
+## Validação
+
+```bash
+npm run build
+npm run lint
+npm test
+```
+
+Os testes exigem um PostgreSQL dedicado, com migrações e seed compatível com os helpers. Eles criam dados; não use o banco de produção. Para gerar novas migrações em desenvolvimento, use `npm run prisma:migrate`; para aplicar as versionadas, use `npx prisma migrate deploy`.
+
+As instruções de equipe e a licença estão no [README principal](../../README.md).
